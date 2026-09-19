@@ -30,7 +30,13 @@ await build({
   logLevel: 'silent',
   external: ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client', 'react-dom/test-utils'],
   jsx: 'automatic',
-  define: { 'import.meta.env.PROD': 'true' },
+  define: {
+      'import.meta.env.VITE_SUPABASE_URL': 'undefined',
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': 'undefined',
+      'import.meta.env.PROD': 'true',
+      'import.meta.env.DEV': 'false',
+      'import.meta.env.MODE': '"production"',
+      'import.meta.env.BASE_URL': '"/"', 'import.meta.env.PROD': 'true' },
 });
 
 let failed = 0;

@@ -34,6 +34,12 @@ jobs:
 
       - name: Build
         run: npm run build -- --base=/My-UPSC-Prep/
+        env:
+          # Cloud sync config (publishable/browser-safe values only).
+          # Secrets take precedence over the committed .env.production.
+          # If neither is set, the build is a fully working local-mode app.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

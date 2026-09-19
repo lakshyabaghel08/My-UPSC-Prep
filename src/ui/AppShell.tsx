@@ -44,7 +44,7 @@ const NAV: { section: string; items: { to: string; icon: string; label: string; 
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [route, navigateTo] = useRoute();
-  const { db, updateSettings } = useStore();
+  const { db, updateSettings, authState, syncStatus, flushSync } = useStore();
   const { push } = useToast();
   const [open, setOpen] = useState(false);
   const stats = dashboardStats(db);
@@ -124,6 +124,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button className="icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="Menu">☰</button>
           <span className="crumb">{titleFor(route)}</span>
           <span className="spacer" />
+          {authState === 'signed-in' ? (
+            <button
+              className={`chip click ${syncStatus.pending > 0 ? 'warn' : syncStatus.lastError ? 'bad' : 'ok'}`}
+              title={syncStatus.lastError ? `Sync issue: ${syncStatus.lastError} — click to retry` : syncStatus.pending ? 'Changes saved locally; will retry sync' : 'All changes synced to your account'}
+              onClick={() => { void flushSync(); }}
+            >
+              {syncStatus.syncing ? '⟳ Syncing…' : syncStatus.pending > 0 ? `⚠ ${syncStatus.pending} pending` : syncStatus.lastError ? '⚠ Sync issue' : '☁ Synced'}
+            </button>
+          ) : (
+            <button className="chip click" title="Running in local mode — sign in from Settings to sync" onClick={() => navigateTo('/settings')}>☰ Local mode</button>
+          )}
           <span className="tiny muted mono">{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
           <button className="icon-btn" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? '☀' : '☾'}</button>
         </header>

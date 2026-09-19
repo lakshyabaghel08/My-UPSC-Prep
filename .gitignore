@@ -4,6 +4,18 @@ node_modules/
 # build output
 dist/
 
+# environment / secrets — never commit
+.env
+.env.*
+!.env.example
+# .env.production is the ONE exception: publishable values only (URL + anon key).
+# Guarded by a CI check below; never place service_role/secret keys there.
+!.env.production
+
+# supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
 # misc
 .DS_Store
 *.local
@@ -11,3 +23,4 @@ dist/
 
 # reference assets stay, but keep git tidy of OS junk inside
 reference/**/.DS_Store
+e2e-output.txt
