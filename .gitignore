@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# misc
+.DS_Store
+*.local
+.test-bundle.mjs
+
+# reference assets stay, but keep git tidy of OS junk inside
+reference/**/.DS_Store
