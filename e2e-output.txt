@@ -1,0 +1,19 @@
+# e2e run 2026-09-19T19:24:05.460Z
+exit=1
+
+Testing against https://agbjadpjrqzwllyeptxv.supabase.co
+
+Auth service health: 401 ✗
+
+⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715
+::error::E2E FATAL — Error: Node.js detected but native WebSocket not found.
+
+Suggested solution: Ensure you are running Node.js 22+ or provide a WebSocket implementation via the transport option.
+    at WebSocketFactory.getWebSocketConstructor (/home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/realtime-js/dist/main/lib/websocket-factory.js:86:15)
+    at RealtimeClient._initializeOptions (/home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js:652:164)
+    at new RealtimeClient (/home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js:185:43)
+    at SupabaseClient._initRealtimeClient (file:///home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/supabase-js/dist/index.mjs:867:10)
+    at new SupabaseClient (file:///home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/supabase-js/dist/index.mjs:674:24)
+    at createClient (file:///home/runner/work/My-UPSC-Prep/My-UPSC-Prep/node_modules/@supabase/supabase-js/dist/index.mjs:900:9)
+    at main (file:///home/runner/work/My-UPSC-Prep/My-UPSC-Prep/scripts/e2e-cloud-test.mjs:66:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
