@@ -264,15 +264,15 @@ async function main() {
   if (r.stdout) process.stdout.write(r.stdout);
   if (r.stderr) process.stderr.write(r.stderr);
   if (r.error) console.log(`spawn error: ${r.error.message}`);
-  const out = `# e2e run ${new Date().toISOString()}\nexit=${r.status}\n\n${r.stdout ?? ''}\n${r.stderr ?? ''}`;
-  fs.writeFileSync(path.join(ROOT, 'e2e-output.txt'), out.slice(0, 100_000));
-  const g = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-  g(['add', '-f', 'e2e-output.txt']); // -f: the file is deliberately git-ignored locally
-  if (g(['commit', '-m', `e2e output (exit ${r.status}) [auto]`]).status === 0) {
-    const push2 = g(['push', 'origin', `HEAD:${process.env.EXPORT_BRANCH || 'arena/01a0ba42-my-upsc-prep'}`]);
-    console.log(push2.status === 0 ? 'e2e output committed to branch ✓' : `output push failed: ${(push2.stderr || '').slice(0, 120)}`);
-  } else {
-    console.log('e2e-output.txt commit skipped (no changes?)');
+  if (process.env.EXPORT_BRANCH) {
+    const out = `# e2e run ${new Date().toISOString()}\nexit=${r.status}\n\n${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+    fs.writeFileSync(path.join(ROOT, 'e2e-output.txt'), out.slice(0, 100_000));
+    const g = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+    g(['add', '-f', 'e2e-output.txt']); // -f: the file is deliberately git-ignored locally
+    if (g(['commit', '-m', `e2e output (exit ${r.status}) [auto]`]).status === 0) {
+      const push2 = g(['push', 'origin', `HEAD:${process.env.EXPORT_BRANCH}`]);
+      console.log(push2.status === 0 ? 'e2e output committed to branch ✓' : `output push failed: ${(push2.stderr || '').slice(0, 120)}`);
+    }
   }
   if (r.status !== 0) {
     const tailErr = (r.stderr || r.stdout || '').trim().slice(-500);

@@ -36,10 +36,11 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout integration branch (scripts + migrations)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: arena/01a0ba42-my-upsc-prep
+        # After this PR merges, the default branch has everything (scripts,
+        # migrations, .env.production). Pre-merge, the pinned copy on main
+        # checked out the integration branch instead.
 
       - uses: actions/setup-node@v4
         with:
