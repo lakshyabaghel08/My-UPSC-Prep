@@ -248,6 +248,12 @@ async function main() {
     return;
   }
   console.log('::group::9 · Live e2e cloud tests (32 checks incl. RLS isolation)');
+  console.log('Installing dependencies…');
+  const ci = spawnSync('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error'], { encoding: 'utf8', cwd: ROOT, env: process.env });
+  if (ci.status !== 0) {
+    console.error(`::error::npm ci failed (exit ${ci.status}): ${(ci.stderr || ci.stdout || '').slice(-400)}`);
+    process.exit(1);
+  }
   console.log('Running scripts/e2e-cloud-test.mjs against the live project…');
   const r = spawnSync('node', ['scripts/e2e-cloud-test.mjs'], {
     encoding: 'utf8', cwd: ROOT,
@@ -261,13 +267,16 @@ async function main() {
   const out = `# e2e run ${new Date().toISOString()}\nexit=${r.status}\n\n${r.stdout ?? ''}\n${r.stderr ?? ''}`;
   fs.writeFileSync(path.join(ROOT, 'e2e-output.txt'), out.slice(0, 100_000));
   const g = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
-  g(['add', 'e2e-output.txt']);
+  g(['add', '-f', 'e2e-output.txt']); // -f: the file is deliberately git-ignored locally
   if (g(['commit', '-m', `e2e output (exit ${r.status}) [auto]`]).status === 0) {
     const push2 = g(['push', 'origin', `HEAD:${process.env.EXPORT_BRANCH || 'arena/01a0ba42-my-upsc-prep'}`]);
     console.log(push2.status === 0 ? 'e2e output committed to branch ✓' : `output push failed: ${(push2.stderr || '').slice(0, 120)}`);
+  } else {
+    console.log('e2e-output.txt commit skipped (no changes?)');
   }
   if (r.status !== 0) {
-    console.error(`::error::node scripts/e2e-cloud-test.mjs failed (exit ${r.status}) — full output committed to e2e-output.txt on the integration branch`);
+    const tailErr = (r.stderr || r.stdout || '').trim().slice(-500);
+    console.error(`::error::node scripts/e2e-cloud-test.mjs failed (exit ${r.status}) — last output: ${tailErr}`);
     process.exit(1);
   }
   console.log('::endgroup::');
