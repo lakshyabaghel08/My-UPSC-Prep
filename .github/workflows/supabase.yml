@@ -27,6 +27,11 @@ on:
           - bootstrap
           - e2e-tests
 
+# contents:write lets the bootstrap step commit .env.production (publishable
+# values only: project URL + anon key) to the integration branch.
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest

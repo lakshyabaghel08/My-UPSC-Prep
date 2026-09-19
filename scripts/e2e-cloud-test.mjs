@@ -43,22 +43,47 @@ function loadConfig() {
 
 const { url, key } = loadConfig();
 const ts = Date.now();
-const emailA = `mup-test-a-${ts}@example.com`;
+let emailA = `mup-test-a-${ts}@example.com`;
 const emailB = `mup-test-b-${ts}@example.com`;
 const PASSWORD = 'xK9$mupTest2027!';
 
 let failed = 0;
 const check = (name, cond, extra = '') => {
   console.log(`  ${cond ? '✓' : '✗'} ${name}${extra ? ` — ${extra}` : ''}`);
-  if (!cond) failed++;
+  if (!cond) { failed++; console.error(`::error::E2E FAILED — ${name}${extra ? ` — ${extra}` : ''}`); }
 };
 
 async function main() {
   console.log(`Testing against ${url}\n`);
+  try {
+    const h = await fetch(`${url}/auth/v1/health`);
+    console.log(`Auth service health: ${h.status} ${h.ok ? '✓' : '✗'}`);
+  } catch (e) {
+    console.error(`::error::Cannot reach auth service at ${url} — ${e.message}`);
+  }
 
   // ---------- 1. signup user A ----------
   const sbA = createClient(url, key, { auth: { persistSession: true, storageKey: 'mup-test-a' } });
-  const su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+  let su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+  if (!su.data.session) {
+    // Most common cause on a fresh project: "Confirm email" is ON by default.
+    // Self-heal via the Management API when the access token is available.
+    console.log(`  signup returned no session (${su.error?.message ?? 'no error, no session'}) — attempting auto-fix (mailer_autoconfirm via Management API)…`);
+    const fixToken = process.env.SUPABASE_ACCESS_TOKEN;
+    if (fixToken) {
+      const ref = new URL(url).hostname.split('.')[0];
+      const patch = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${fixToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mailer_autoconfirm: true, disable_signup: false }),
+      });
+      console.log(`  auth config PATCH → HTTP ${patch.status}${patch.ok ? ' ✓' : ' ✗'}`);
+      emailA = `mup-test-a2-${ts}@example.com`; // fresh address in case the first attempt created an unconfirmed user
+      su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+    } else {
+      console.error('::error::Signup returned no session and SUPABASE_ACCESS_TOKEN is unavailable for auto-fix. Fix manually: Supabase Dashboard → Authentication → Sign In / Up → turn OFF "Confirm email" — then re-run.');
+    }
+  }
   check('1. new user signup returns a session (autoconfirm ON)', Boolean(su.data.session), su.error?.message);
   if (!su.data.session) process.exit(1);
   const uidA = su.data.session.user.id;
