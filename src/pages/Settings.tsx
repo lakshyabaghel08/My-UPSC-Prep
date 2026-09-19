@@ -9,7 +9,7 @@ import { syllabus } from '../data/syllabus';
 import { fmtDuration } from '../lib/date';
 
 export function Settings() {
-  const { db, updateSettings, replaceDb, resetProgressOnly } = useStore();
+  const { db, updateSettings, replaceDb, resetProgressOnly, authState, accountEmail, syncStatus, logout, flushSync, migrateLocalToCloud } = useStore();
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
@@ -70,6 +70,40 @@ export function Settings() {
       </div>
 
       <div className="grid cols-2">
+        <Card>
+          <CardHead title="Account & sync" hint="Supabase — your data, RLS-protected" />
+          <div className="card-pad" style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {authState === 'signed-in' ? (
+              <>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="small" style={{ fontWeight: 700 }}>{accountEmail ?? 'Signed in'}</div>
+                    <div className="tiny muted">
+                      {syncStatus.pending > 0 ? `${syncStatus.pending} changes queued for sync` : syncStatus.lastSyncAt ? `Last sync ${new Date(syncStatus.lastSyncAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Synced'}
+                      {syncStatus.lastError ? ` · ⚠ ${syncStatus.lastError}` : ''}
+                    </div>
+                  </div>
+                  <span className={`chip ${syncStatus.pending ? 'warn' : 'ok'}`}>{syncStatus.pending ? '⟳ Queued' : '☁ Synced'}</span>
+                </div>
+                <div className="row" style={{ gap: 8 }}>
+                  <button className="btn sm" onClick={() => { void flushSync().then(() => push('Sync complete', 'ok')); }} disabled={syncStatus.syncing}>⟳ Sync now</button>
+                  <button className="btn sm geo" onClick={() => { void migrateLocalToCloud((m) => push(m)); push('Importing local data…'); }}>⤒ Re-import local data</button>
+                  <button className="btn sm bad" onClick={() => { void logout().then(() => push('Signed out — see you soon')); }}>Sign out</button>
+                </div>
+                <p className="tiny muted">Sign-in happens on the start screen. "Re-import" replaces cloud data with this device's data (useful after restoring a backup file locally).</p>
+              </>
+            ) : (
+              <>
+                <p className="small soft">
+                  You're using <b style={{ color: 'var(--text)' }}>local mode</b> — everything lives in this browser only.
+                  {' '}Sign in to sync your preparation across devices with RLS-protected cloud storage.
+                </p>
+                <button className="btn primary sm" onClick={() => { window.location.hash = '/'; window.location.reload(); }}>☁ Sign in to enable sync</button>
+              </>
+            )}
+          </div>
+        </Card>
+
         <Card>
           <CardHead title="Personalization" />
           <div className="card-pad" style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 13 }}>

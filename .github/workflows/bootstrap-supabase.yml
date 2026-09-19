@@ -1,0 +1,25 @@
+name: Bootstrap Supabase project
+
+# One-time (idempotent) setup: creates the my-upsc-prep project, applies the
+# SQL migration, enables email auth without confirmation, prints the
+# browser-safe project URL + publishable key to the run log.
+#
+# Requires repository secret: SUPABASE_ACCESS_TOKEN (delete it afterwards).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run bootstrap
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/bootstrap-supabase.mjs

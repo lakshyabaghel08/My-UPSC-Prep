@@ -1,8 +1,9 @@
 import React from 'react';
-import { StoreProvider } from './store/store';
+import { StoreProvider, useStore } from './store/store';
 import { ToastProvider } from './ui/toast';
 import { AppShell } from './ui/AppShell';
 import { useRoute } from './ui/router';
+import { AuthPage, MigrationModal } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
 import { Syllabus } from './pages/Syllabus';
 import { Tasks } from './pages/Tasks';
@@ -20,6 +21,23 @@ import { Settings } from './pages/Settings';
 
 function Router() {
   const [route] = useRoute();
+  const { authState } = useStore();
+
+  // Loading the session — splash to avoid flashing private data
+  if (authState === 'loading') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="brand-mark" style={{ width: 44, height: 44, fontSize: 21, margin: '0 auto 10px' }}>M</div>
+          <div className="muted small">Loading your preparation…</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated — auth screen instead of the app (private data protected)
+  if (authState === 'gate') return <AuthPage />;
+
   const page = (() => {
     switch (route) {
       case '/dashboard': return <Dashboard />;
@@ -39,7 +57,12 @@ function Router() {
       default: return <Dashboard />;
     }
   })();
-  return <AppShell>{page}</AppShell>;
+  return (
+    <>
+      <AppShell>{page}</AppShell>
+      <MigrationModal />
+    </>
+  );
 }
 
 export default function App() {
