@@ -9,6 +9,8 @@ on:
         options:
           - bootstrap
           - e2e-tests
+permissions:
+  contents: write
 jobs:
   run:
     runs-on: ubuntu-latest
