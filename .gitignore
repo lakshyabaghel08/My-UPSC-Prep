@@ -8,6 +8,9 @@ dist/
 .env
 .env.*
 !.env.example
+# .env.production is the ONE exception: publishable values only (URL + anon key).
+# Guarded by a CI check below; never place service_role/secret keys there.
+!.env.production
 
 # supabase CLI local state
 supabase/.temp/

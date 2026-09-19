@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -200,6 +201,65 @@ async function main() {
   console.log(`MUP_PUBLISHABLE_KEY=${publishable}`);
   console.log('::endgroup::');
   console.log('BOOTSTRAP COMPLETE ✓ — copy MUP_PROJECT_URL and MUP_PUBLISHABLE_KEY (browser-safe publishable key) into the two VITE_ repo secrets. The service_role/secret key is never read or printed.');
+
+  // ---- Step 8: commit publishable config to the integration branch --------
+  console.log('::group::8 · Export .env.production (URL + publishable key only) and push');
+  const envPath = path.join(ROOT, '.env.production');
+  const envContent = [
+    '# Publishable Supabase config — safe to commit to a public repo.',
+    '# Contains ONLY the project URL + publishable (anon) key, which ship in the',
+    '# browser bundle anyway. Row Level Security protects all data.',
+    '# NEVER place service_role/secret keys or the DB password in this file.',
+    `VITE_SUPABASE_URL=${projectUrl}`,
+    `VITE_SUPABASE_PUBLISHABLE_KEY=${publishable}`,
+    '',
+  ].join('\n');
+  const allowedLines = envContent.split('\n').filter((l) => l && !l.startsWith('#'));
+  const bad = allowedLines.filter((l) => !/^(VITE_SUPABASE_URL|VITE_SUPABASE_PUBLISHABLE_KEY)=/.test(l));
+  if (allowedLines.length !== 2 || bad.length > 0) {
+    console.error('::error::Refusing to write .env.production: only VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are permitted.');
+    process.exit(1);
+  }
+  fs.writeFileSync(envPath, envContent);
+  console.log('.env.production written (publishable values only).');
+  if (process.env.SKIP_ENV_PUSH === '1') {
+    console.log('SKIP_ENV_PUSH=1 — skipping git push.');
+  } else {
+    const target = process.env.EXPORT_BRANCH || 'arena/01a0ba42-my-upsc-prep';
+    const git = (args, opts = {}) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', ...opts });
+    git(['config', 'user.name', 'github-actions[bot]']);
+    git(['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
+    git(['add', '.env.production']);
+    const commit = git(['commit', '-m', 'Publishable Supabase config: project URL + publishable key (RLS protects data)']);
+    if (commit.status === 0) {
+      const push = git(['push', 'origin', `HEAD:${target}`]);
+      console.log(push.status === 0
+        ? `Pushed .env.production to ${target} ✓`
+        : `::warning::Push to ${target} failed (workflow token may be read-only): ${(push.stderr || push.stdout || '').slice(0, 160)}. Non-fatal — the values are in the log above; e2e still runs from memory.`);
+    } else {
+      console.log('::notice::Nothing to commit (.env.production unchanged).');
+    }
+  }
+  console.log('::endgroup::');
+
+  // ---- Step 9: full live e2e suite (32 checks incl. RLS isolation) --------
+  if (process.env.SKIP_E2E === '1') {
+    console.log('SKIP_E2E=1 — skipping live e2e suite.');
+    return;
+  }
+  console.log('::group::9 · Live e2e cloud tests (32 checks incl. RLS isolation)');
+  console.log('Running scripts/e2e-cloud-test.mjs against the live project…');
+  const runStep = (cmd, args) => {
+    const r = spawnSync(cmd, args, {
+      stdio: 'inherit', cwd: ROOT,
+      env: { ...process.env, VITE_SUPABASE_URL: projectUrl, VITE_SUPABASE_PUBLISHABLE_KEY: publishable },
+    });
+    if (r.status !== 0) { console.error(`::error::${cmd} ${args.join(' ')} failed`); process.exit(1); }
+  };
+  runStep('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error']);
+  runStep('node', ['scripts/e2e-cloud-test.mjs']);
+  console.log('::endgroup::');
+  console.log('ALL DONE ✓ — project live, migration applied, RLS verified, e2e suite green.');
 }
 
 main().catch((e) => {
