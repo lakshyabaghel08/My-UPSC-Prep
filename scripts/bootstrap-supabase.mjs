@@ -249,15 +249,27 @@ async function main() {
   }
   console.log('::group::9 · Live e2e cloud tests (32 checks incl. RLS isolation)');
   console.log('Running scripts/e2e-cloud-test.mjs against the live project…');
-  const runStep = (cmd, args) => {
-    const r = spawnSync(cmd, args, {
-      stdio: 'inherit', cwd: ROOT,
-      env: { ...process.env, VITE_SUPABASE_URL: projectUrl, VITE_SUPABASE_PUBLISHABLE_KEY: publishable },
-    });
-    if (r.status !== 0) { console.error(`::error::${cmd} ${args.join(' ')} failed`); process.exit(1); }
-  };
-  runStep('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error']);
-  runStep('node', ['scripts/e2e-cloud-test.mjs']);
+  const r = spawnSync('node', ['scripts/e2e-cloud-test.mjs'], {
+    encoding: 'utf8', cwd: ROOT,
+    env: { ...process.env, VITE_SUPABASE_URL: projectUrl, VITE_SUPABASE_PUBLISHABLE_KEY: publishable },
+  });
+  // Stream output AND persist it: commit to the integration branch so the
+  // full log is readable even when the log-download host is unreachable.
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  if (r.error) console.log(`spawn error: ${r.error.message}`);
+  const out = `# e2e run ${new Date().toISOString()}\nexit=${r.status}\n\n${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+  fs.writeFileSync(path.join(ROOT, 'e2e-output.txt'), out.slice(0, 100_000));
+  const g = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+  g(['add', 'e2e-output.txt']);
+  if (g(['commit', '-m', `e2e output (exit ${r.status}) [auto]`]).status === 0) {
+    const push2 = g(['push', 'origin', `HEAD:${process.env.EXPORT_BRANCH || 'arena/01a0ba42-my-upsc-prep'}`]);
+    console.log(push2.status === 0 ? 'e2e output committed to branch ✓' : `output push failed: ${(push2.stderr || '').slice(0, 120)}`);
+  }
+  if (r.status !== 0) {
+    console.error(`::error::node scripts/e2e-cloud-test.mjs failed (exit ${r.status}) — full output committed to e2e-output.txt on the integration branch`);
+    process.exit(1);
+  }
   console.log('::endgroup::');
   console.log('ALL DONE ✓ — project live, migration applied, RLS verified, e2e suite green.');
 }

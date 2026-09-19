@@ -64,22 +64,40 @@ async function main() {
 
   // ---------- 1. signup user A ----------
   const sbA = createClient(url, key, { auth: { persistSession: true, storageKey: 'mup-test-a' } });
-  let su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+  let su;
+  try {
+    su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+  } catch (e) {
+    console.log(`  signUp THREW: ${e?.message}`);
+    su = { data: {}, error: e };
+  }
   if (!su.data.session) {
     // Most common cause on a fresh project: "Confirm email" is ON by default.
     // Self-heal via the Management API when the access token is available.
     console.log(`  signup returned no session (${su.error?.message ?? 'no error, no session'}) — attempting auto-fix (mailer_autoconfirm via Management API)…`);
+    console.log(`  signUp error details: ${JSON.stringify({ message: su.error?.message, code: su.error?.code, status: su.error?.status ?? su.error?.status_code, names: Object.getPrototypeOf(su.error ?? {})?.constructor?.name })}`);
     const fixToken = process.env.SUPABASE_ACCESS_TOKEN;
     if (fixToken) {
       const ref = new URL(url).hostname.split('.')[0];
-      const patch = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${fixToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mailer_autoconfirm: true, disable_signup: false }),
-      });
+      let patch;
+      try {
+        patch = await fetch(`https://api.supabase.com/v1/projects/${ref}/config/auth`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${fixToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mailer_autoconfirm: true, disable_signup: false }),
+        });
+      } catch (e) {
+        patch = { ok: false, status: 0 };
+        console.log(`  auth config PATCH threw: ${e?.message}`);
+      }
       console.log(`  auth config PATCH → HTTP ${patch.status}${patch.ok ? ' ✓' : ' ✗'}`);
       emailA = `mup-test-a2-${ts}@example.com`; // fresh address in case the first attempt created an unconfirmed user
-      su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+      try {
+        su = await sbA.auth.signUp({ email: emailA, password: PASSWORD });
+      } catch (e2) {
+        console.log(`  signUp retry THREW: ${e2?.message}`);
+        su = { data: {}, error: e2 };
+      }
     } else {
       console.error('::error::Signup returned no session and SUPABASE_ACCESS_TOKEN is unavailable for auto-fix. Fix manually: Supabase Dashboard → Authentication → Sign In / Up → turn OFF "Confirm email" — then re-run.');
     }
@@ -154,7 +172,13 @@ async function main() {
 
   // ---------- 9. RLS isolation with user B ----------
   const sbB = createClient(url, key, { auth: { persistSession: true, storageKey: 'mup-test-b' } });
-  const suB = await sbB.auth.signUp({ email: emailB, password: PASSWORD });
+  let suB;
+  try {
+    suB = await sbB.auth.signUp({ email: emailB, password: PASSWORD });
+  } catch (e) {
+    console.log(`  user B signUp THREW: ${e?.message}`);
+    suB = { data: {}, error: e };
+  }
   check('24. second user signup', Boolean(suB.data.session), suB.error?.message);
   const uidB = suB.data.session.user.id;
   const leakTasks = await sbB.from('tasks').select('*');
@@ -169,7 +193,13 @@ async function main() {
   const verify = await sbB.from('tasks').select('*').eq('id', taskId);
   check('29. RLS: user B cannot UPDATE user A rows', Boolean(crossUpdate.error) || (verify.data ?? []).length === 0);
   const crossDelete = await sbB.from('tasks').delete().eq('user_id', uidA);
-  const stillThere = await sbA.auth.signInWithPassword({ email: emailA, password: PASSWORD });
+  let stillThere;
+  try {
+    stillThere = await sbA.auth.signInWithPassword({ email: emailA, password: PASSWORD });
+  } catch (e) {
+    console.log(`  signInWithPassword THREW: ${e?.message}`);
+    stillThere = { data: {} };
+  }
   const cnt = stillThere.data.session ? await sbA.from('tasks').select('id', { count: 'exact', head: true }) : null;
   check('30. RLS: user B cannot DELETE user A rows', (cnt?.count ?? 0) >= 26);
   // login for user A works (covers login flow)
@@ -198,4 +228,4 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((e) => { console.error('FATAL:', e.message); process.exit(1); });
+main().catch((e) => { console.error(`::error::E2E FATAL — ${e?.stack || e?.message || e}`); process.exit(1); });
