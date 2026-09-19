@@ -1,0 +1,29 @@
+{
+  "name": "my-upsc-prep",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "My UPSC Prep — personal, offline-first UPSC CSE 2027 preparation tracker (Geography Optional)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node scripts/logic-test.mjs && node scripts/smoke-test.mjs",
+    "test:logic": "node scripts/logic-test.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "generate:syllabus": "node scripts/extract-reference-syllabus.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.25.0",
+    "jsdom": "^24.1.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
