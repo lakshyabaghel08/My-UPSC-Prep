@@ -1,0 +1,34 @@
+name: Supabase operations
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to run
+        type: choice
+        default: bootstrap
+        options:
+          - bootstrap
+          - e2e-tests
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch (scripts + migrations)
+        uses: actions/checkout@v4
+        with:
+          ref: arena/01a0ba42-my-upsc-prep
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bootstrap Supabase project
+        if: ${{ inputs.mode == 'bootstrap' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/bootstrap-supabase.mjs
+      - name: E2E cloud tests
+        if: ${{ inputs.mode == 'e2e-tests' }}
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npm ci && node scripts/e2e-cloud-test.mjs
