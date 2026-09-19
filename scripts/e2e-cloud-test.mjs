@@ -15,6 +15,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 
+// supabase-js realtime needs a WHATWG WebSocket. Node 21+ ships one natively;
+// older runners (Node 20) must polyfill it — the officially documented fix.
+if (typeof globalThis.WebSocket === 'undefined') {
+  const ws = await import('ws');
+  globalThis.WebSocket = ws.default?.WebSocket ?? ws.WebSocket ?? ws.default ?? ws;
+  console.log('Polyfilled globalThis.WebSocket with the ws package (Node < 21 runner).');
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 
@@ -56,8 +64,8 @@ const check = (name, cond, extra = '') => {
 async function main() {
   console.log(`Testing against ${url}\n`);
   try {
-    const h = await fetch(`${url}/auth/v1/health`);
-    console.log(`Auth service health: ${h.status} ${h.ok ? '✓' : '✗'}`);
+    const h = await fetch(`${url}/auth/v1/health`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    console.log(`Auth service health: ${h.status} ${h.ok ? '✓' : '(401 without apikey means service is up)'}`);
   } catch (e) {
     console.error(`::error::Cannot reach auth service at ${url} — ${e.message}`);
   }
