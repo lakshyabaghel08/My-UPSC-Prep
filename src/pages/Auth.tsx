@@ -12,6 +12,9 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // Default on: matches the previous behavior (session survives reloads).
+  // Off: session-only — the app signs out on its own after the browser session.
+  const [rememberMe, setRememberMe] = useState(true);
 
   const localRecords = db.tasks.length + Object.keys(db.progress).length + db.lectures.length + db.pyqs.length;
 
@@ -23,7 +26,7 @@ export function AuthPage() {
       return;
     }
     setBusy(true);
-    const res = mode === 'signin' ? await signIn(email.trim(), password) : await signUp(email.trim(), password);
+    const res = mode === 'signin' ? await signIn(email.trim(), password, rememberMe) : await signUp(email.trim(), password);
     setBusy(false);
     if (res.error) setError(res.error);
     else if (res.needsConfirmation) setInfo('Check your inbox — confirm your email, then sign in.');
@@ -68,6 +71,17 @@ export function AuthPage() {
                   placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
               </div>
+              {mode === 'signin' && (
+                <>
+                  <label className="checkbox-row">
+                    <input type="checkbox" checked={rememberMe} onChange={(e2) => setRememberMe(e2.target.checked)} />
+                    Remember me
+                  </label>
+                  <p className="tiny muted" style={{ marginTop: -6 }}>
+                    Off = this session stays only in this browser session — nothing is stored on this device.
+                  </p>
+                </>
+              )}
               {error && <div className="small" style={{ color: 'var(--bad)', background: 'var(--bad-soft)', padding: '8px 12px', borderRadius: 9 }}>{error}</div>}
               {info && <div className="small" style={{ color: 'var(--info)', background: 'var(--info-soft)', padding: '8px 12px', borderRadius: 9 }}>{info}</div>}
               <button className="btn primary block" disabled={busy} style={{ marginTop: 4, padding: '10px 0' }}>

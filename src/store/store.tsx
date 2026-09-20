@@ -19,8 +19,9 @@ import { loadDb, saveDb, newDatabase } from './db';
 import { uid, clamp } from '../lib/id';
 import { todayKey } from '../lib/date';
 import { MAX_REVISION, nextRevisionDate, revisionBucket } from '../lib/revision';
-import { getSupabase, isCloudConfigured } from '../lib/supabase';
+import { getSupabase, getSessionOnlySupabase, isCloudConfigured } from '../lib/supabase';
 import { Repository } from '../data/repository';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type AuthState = 'loading' | 'gate' | 'signed-in' | 'local';
 export interface SyncStatus {
@@ -41,7 +42,9 @@ export interface StoreValue {
   migrationPrompt: boolean;
   dismissMigrationPrompt: () => void;
   continueLocal: () => void;
-  signIn: (email: string, password: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
+  /** `rememberMe` (default true): true persists the session in this browser
+   *  (survives reloads); false keeps it in memory only for this page session. */
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signUp: (email: string, password: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   logout: () => Promise<void>;
   migrateLocalToCloud: (onStep?: (msg: string, pct: number) => void) => Promise<{ ok: boolean; error?: string }>;
@@ -116,6 +119,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const repoRef = useRef<Repository | null>(null);
   const userIdRef = useRef<string | null>(null);
+  /** The Supabase client that owns the current session (persistent or
+   *  memory-only, depending on how the user signed in). */
+  const authClientRef = useRef<SupabaseClient | null>(null);
+  const activeClient = useCallback(() => authClientRef.current ?? getSupabase(), []);
   const pendingOps = useRef<Map<string, () => Promise<void>>>(new Map());
   const progressDirty = useRef<Set<string>>(new Set());
   const progressTimer = useRef<number | undefined>(undefined);
@@ -123,9 +130,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const repo = useCallback((): Repository | null => {
     if (authState !== 'signed-in' || !isCloudConfigured || !userIdRef.current) return null;
-    if (!repoRef.current) repoRef.current = new Repository(getSupabase(), userIdRef.current);
+    if (!repoRef.current) repoRef.current = new Repository(activeClient(), userIdRef.current);
     return repoRef.current;
-  }, [authState]);
+  }, [authState, activeClient]);
 
   const markSynced = () => setSyncStatus((s) => ({ ...s, syncing: false, lastError: null, lastSyncAt: new Date().toISOString() }));
 
@@ -523,13 +530,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const resetProgressOnly = useCallback(() => {
     setDb((d) => ({ ...d, progress: {}, revisionLogs: [] }));
     void push('reset-progress', async () => {
-      const sb = getSupabase();
+      const sb = activeClient();
       const userId = userIdRef.current;
       if (!userId) return;
       await sb.from('syllabus_progress').delete().eq('user_id', userId);
       await sb.from('revision_logs').delete().eq('user_id', userId);
     });
-  }, [push]);
+  }, [push, activeClient]);
 
   // ---------------------------------------------------------------- auth flows
   const mergeRemoteIntoLocal = useCallback((remote: Partial<MupDatabase> & { counts?: Record<string, number> }) => {
@@ -567,7 +574,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const afterSignIn = useCallback(async (userId: string, email: string) => {
     userIdRef.current = userId;
     setAccountEmail(email);
-    const r = new Repository(getSupabase(), userId);
+    // The repository must query through the client that owns the session,
+    // otherwise PostgREST calls go out unauthenticated.
+    const r = new Repository(activeClient(), userId);
     repoRef.current = r;
     try {
       const remote = await r.pullAll();
@@ -589,14 +598,39 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus((s) => ({ ...s, lastError: e instanceof Error ? e.message : String(e) }));
     }
     setAuthState('signed-in');
-  }, [mergeRemoteIntoLocal]);
+  }, [mergeRemoteIntoLocal, activeClient]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  /** Central SIGNED_OUT handler (shared by both clients). */
+  const handleSignedOut = useCallback((event: string) => {
+    if (event !== 'SIGNED_OUT') return;
+    authClientRef.current = null;
+    repoRef.current = null; userIdRef.current = null;
+    setAccountEmail(null); setMigrationPrompt(false);
+    setAuthState('gate');
+  }, []);
+
+  // The memory-only client (remember-me OFF) is created lazily — only when
+  // actually needed — and gets its own SIGNED_OUT listener at that point.
+  const sessionOnlySubRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const listenSessionOnlyClient = useCallback(() => {
+    if (sessionOnlySubRef.current) return;
+    const { data: sub } = getSessionOnlySupabase().auth.onAuthStateChange(handleSignedOut);
+    sessionOnlySubRef.current = sub.subscription;
+  }, [handleSignedOut]);
+
+  const signIn = useCallback(async (email: string, password: string, rememberMe: boolean = true) => {
     if (!isCloudConfigured) return { error: 'Cloud sync is not configured.' };
+    // "Remember me" on  → persistent client (session stored in this browser's
+    //                      localStorage, survives reloads).
+    // "Remember me" off → memory-only client (session lives for this page
+    //                      session; nothing is written to storage).
+    const sb = rememberMe ? getSupabase() : getSessionOnlySupabase();
+    if (!rememberMe) listenSessionOnlyClient();
     try {
-      const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
       if (!data.session) return { needsConfirmation: true };
+      authClientRef.current = sb;
       await afterSignIn(data.session.user.id, data.session.user.email ?? email);
       return {};
     } catch (e) {
@@ -607,9 +641,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const signUp = useCallback(async (email: string, password: string) => {
     if (!isCloudConfigured) return { error: 'Cloud sync is not configured.' };
     try {
-      const { data, error } = await getSupabase().auth.signUp({ email, password });
+      const sb = getSupabase();
+      const { data, error } = await sb.auth.signUp({ email, password });
       if (error) return { error: error.message };
       if (!data.session) return { needsConfirmation: true };
+      authClientRef.current = sb;
       await afterSignIn(data.session.user.id, data.session.user.email ?? email);
       return {};
     } catch (e) {
@@ -618,7 +654,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [afterSignIn]);
 
   const logout = useCallback(async () => {
-    if (isCloudConfigured) { try { await getSupabase().auth.signOut(); } catch { /* ignore */ } }
+    if (isCloudConfigured) {
+      try { await activeClient().auth.signOut(); } catch { /* ignore */ }
+    }
+    authClientRef.current = null;
     repoRef.current = null;
     userIdRef.current = null;
     pendingOps.current.clear();
@@ -626,7 +665,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAccountEmail(null);
     setMigrationPrompt(false);
     setAuthState(isCloudConfigured ? 'gate' : 'local');
-  }, []);
+  }, [activeClient]);
 
   const continueLocal = useCallback(() => setAuthState('local'), []);
   const dismissMigrationPrompt = useCallback(() => setMigrationPrompt(false), []);
@@ -636,7 +675,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!r || !userIdRef.current) return { ok: false, error: 'Not signed in.' };
     const userId = userIdRef.current;
     try {
-      const sb = getSupabase();
+      const sb = activeClient();
       // Wipe cloud data first so (re)runs never create duplicates.
       // Local data is NEVER touched — the device remains the safe copy.
       onStep?.('Preparing cloud account…', 2);
@@ -661,11 +700,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus((s) => ({ ...s, lastError: msg }));
       return { ok: false, error: msg };
     }
-  }, [repo, applyIdMap]);
+  }, [repo, applyIdMap, activeClient]);
 
   // ---------------------------------------------------------------- boot
   useEffect(() => {
     if (!isCloudConfigured) { setAuthState('local'); return; }
+    // Only the persistent client can have a stored session to restore on load
+    // (a "remember me" OFF session is memory-only and never survives a reload).
     const sb = getSupabase();
     let cancelled = false;
     (async () => {
@@ -673,20 +714,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const { data } = await sb.auth.getSession();
         if (cancelled) return;
         const session = data.session;
-        if (session?.user) await afterSignIn(session.user.id, session.user.email ?? 'you');
+        if (session?.user) {
+          authClientRef.current = sb;
+          await afterSignIn(session.user.id, session.user.email ?? 'you');
+        }
         else setAuthState('gate');
       } catch {
         if (!cancelled) setAuthState('gate');
       }
     })();
-    const { data: sub } = sb.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
-        repoRef.current = null; userIdRef.current = null;
-        setAccountEmail(null); setMigrationPrompt(false);
-        setAuthState('gate');
-      }
-    });
-    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+    const { data: sub } = sb.auth.onAuthStateChange(handleSignedOut);
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+      sessionOnlySubRef.current?.unsubscribe();
+      sessionOnlySubRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

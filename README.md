@@ -49,7 +49,8 @@ node scripts/auth-gate-test.mjs   # build first — asserts the auth gate hides 
 node scripts/verify-migration.mjs # embedded Postgres: applies the SQL migration, 27 RLS/schema checks
 ```
 
-Live cloud suite (32 checks: auth, CRUD, RLS isolation between two real users, bulk migration):
+Live cloud suite (35 checks: auth incl. remember-me session semantics, CRUD, RLS isolation
+between two real users, bulk migration):
 
 ```bash
 node scripts/e2e-cloud-test.mjs    # or just run it via Actions → "Supabase operations" → e2e-tests
@@ -66,6 +67,11 @@ Built on **Supabase** (Postgres + Auth + Row Level Security). Behavior:
   Supabase code paths activate, no network calls are made.
 - **Sign-in gate** — private data is never rendered before authentication. A "Continue on this
   device" escape hatch keeps local-only use one click away.
+- **Remember me** — sign-in offers a "Remember me" checkbox (checked by default). Checked, the
+  session is stored in that browser and survives restarts. Unchecked, the session is held in
+  memory only: it lasts for the current browser session, nothing is written to the device, and
+  the app signs back out on its own after a reload. The choice is per browser — it never affects
+  other devices or anything server-side.
 - **Local-first, optimistic** — every mutation saves locally *instantly*, then pushes to the cloud
   in the background. Offline or on failure, changes queue and retry (on reconnect + every 60 s);
   nothing is silently lost. A header chip shows live sync state.
@@ -140,7 +146,7 @@ supabase/
   migrations/             # idempotent schema + RLS (13 tables, verified on PG 18 pre-apply)
 scripts/
   bootstrap-supabase.mjs  # provisioning: create/reuse project, migrate, verify RLS, export config
-  e2e-cloud-test.mjs      # live 32-check suite (auth/CRUD/RLS isolation)
+  e2e-cloud-test.mjs      # live 35-check suite (auth/CRUD/RLS isolation)
   verify-migration.mjs    # offline migration verifier (embedded Postgres)
   extract-reference-syllabus.mjs
   data/geographyOptional.mjs
