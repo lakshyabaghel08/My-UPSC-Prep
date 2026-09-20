@@ -20,7 +20,6 @@ const NAV: { section: string; items: { to: string; icon: string; label: string; 
     items: [
       { to: '/syllabus', icon: '☰', label: 'Operational Syllabus' },
       { to: '/revision', icon: '↻', label: 'Revision R1–R5', badge: 'revision' },
-      { to: '/pyq', icon: '?', label: 'PYQ Tracker' },
     ],
   },
   {
@@ -48,9 +47,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { db, updateSettings, authState, syncStatus, flushSync } = useStore();
   const { push } = useToast();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('mup.sidebar.collapsed') === 'true'; } catch { return false; }
+  });
   const stats = dashboardStats(db);
 
   useEffect(() => { setOpen(false); }, [route]);
+  const toggleCollapsed = () => setCollapsed((value) => {
+    const next = !value;
+    try { localStorage.setItem('mup.sidebar.collapsed', String(next)); } catch { /* optional preference */ }
+    return next;
+  });
 
   const theme = db.settings.theme;
   const toggleTheme = () => {
@@ -73,24 +80,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const titleFor = (r: string) => NAV.flatMap((s) => s.items).find((i) => i.to === r)?.label ?? 'Dashboard';
 
   return (
-    <div className="shell">
+    <div className={`shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
       {open && <div className="sidebar-backdrop show" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
           <div className="brand-mark">M</div>
-          <div>
+          <div className="brand-copy">
             <div>My UPSC Prep</div>
             <div className="brand-sub">CSE {db.settings.targetExamYear} · {db.settings.optional}</div>
           </div>
+          <button className="sidebar-collapse-btn" onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? '›' : '‹'}</button>
         </div>
         {NAV.map((sec) => (
           <React.Fragment key={sec.section}>
             <div className="nav-section">{sec.section}</div>
             <nav className="nav">
               {sec.items.map((item) => (
-                <button key={item.to} className={`nav-item ${route === item.to ? 'active' : ''}`} onClick={() => navigateTo(item.to)}>
+                <button key={item.to} title={collapsed ? item.label : undefined} aria-label={item.label} className={`nav-item ${route === item.to ? 'active' : ''}`} onClick={() => navigateTo(item.to)}>
                   <span className="ico">{item.icon}</span>
-                  {item.label}
+                  <span className="nav-label">{item.label}</span>
                   {badge(item.badge)}
                 </button>
               ))}
@@ -99,12 +107,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
         <div className="nav-section">System</div>
         <nav className="nav" style={{ paddingBottom: 6 }}>
-          <button className={`nav-item ${route === '/settings' ? 'active' : ''}`} onClick={() => navigateTo('/settings')}>
-            <span className="ico">⚙</span>Settings & Backup
+          <button title={collapsed ? 'Settings & Backup' : undefined} aria-label="Settings & Backup" className={`nav-item ${route === '/settings' ? 'active' : ''}`} onClick={() => navigateTo('/settings')}>
+            <span className="ico">⚙</span><span className="nav-label">Settings & Backup</span>
           </button>
         </nav>
         <div className="sidebar-foot">
-          <div className="card card-pad" style={{ padding: '10px 12px' }}>
+          <div className="card card-pad sidebar-today" style={{ padding: '10px 12px' }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <span className="tiny" style={{ fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.06em' }}>TODAY</span>
               <span className="tiny mono" style={{ fontWeight: 700, color: 'var(--ok)' }}>{Math.round(stats.todayMinutes)}m / {Math.round(db.settings.dailyTargetMinutes / 60 * 100) / 100}h</span>
@@ -115,7 +123,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="tiny muted" style={{ marginTop: 6 }}>🔥 {stats.streak}-day streak · {stats.revision.dueToday} revisions due</div>
           </div>
           <div className="row" style={{ marginTop: 8, gap: 6 }}>
-            <button className="btn sm ghost grow" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '☾ Dark' : '☀ Light'}</button>
+            <button className="btn sm ghost grow sidebar-theme" onClick={toggleTheme} title="Toggle theme"><span>{theme === 'dark' ? '☾' : '☀'}</span><span className="nav-label">{theme === 'dark' ? 'Dark' : 'Light'}</span></button>
             <button className="btn sm ghost" onClick={() => { downloadBackup(db); push('Backup downloaded', 'ok'); }} title="Download backup">⤓</button>
           </div>
         </div>

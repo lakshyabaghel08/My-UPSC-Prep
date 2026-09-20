@@ -71,13 +71,12 @@ const ROUTES = [
   ['Calendar', 'Calendar'],
   ['Operational Syllabus', 'Operational Syllabus'],
   ['Revision R1–R5', 'Revision'],
-  ['PYQ Tracker', 'PYQ Tracker'],
   ['Daily Planner', 'Daily Planner'],
   ['Study Timer', 'Study Timer'],
   ['Test Tracker', 'Test Tracker'],
   ['Answer Writing', 'Answer Writing'],
   ['Current Affairs', 'Current Affairs'],
-  ['Geo Lectures', 'Lecture Tracker'],
+  ['Geo Lectures', 'Lecture Series'],
   ['Study Hours', 'Study Hours'],
   ['Prep Analytics', 'Preparation Analytics'],
   ['Settings & Backup', 'Settings & Backup'],
@@ -93,6 +92,19 @@ try {
     if (!ok) { failed++; console.log(`  ✗ ${nav}: expected "${expect}" in page`); }
     else console.log(`  ✓ ${nav}`);
   }
+
+  const pyqRemoved = ![...document.querySelectorAll('.nav-item')].some((node) => node.textContent?.includes('PYQ Tracker'));
+  console.log(pyqRemoved ? '  ✓ standalone PYQ Tracker removed' : '  ✗ standalone PYQ Tracker still present');
+  if (!pyqRemoved) failed++;
+  const habitRemoved = !text().includes('Daily habits');
+  console.log(habitRemoved ? '  ✓ habit UI removed' : '  ✗ habit UI still present');
+  if (!habitRemoved) failed++;
+  const collapseButton = document.querySelector('.sidebar-collapse-btn');
+  collapseButton?.click();
+  await sleep(50);
+  const collapsed = document.querySelector('.shell')?.classList.contains('sidebar-collapsed');
+  console.log(collapsed ? '  ✓ sidebar collapse works' : '  ✗ sidebar did not collapse');
+  if (!collapsed) failed++;
 
   // hash routing direct check
   window.location.hash = '/syllabus';

@@ -1,3 +1,5 @@
+import { applicationDayKey, applicationDayStart, daysBetween } from './date';
+
 /** Revision spaced-repetition engine — preserves the reference R1–R5 behaviour.
  *
  * Base intervals by revision count (R1..R4+): 3, 7, 21, 45 days.
@@ -29,17 +31,15 @@ export const MAX_REVISION = 5;
 export function nextRevisionDate(lastRevised: Date, revisionCount: number, confidence: 0 | 1 | 2 | 3): Date {
   const d = new Date(lastRevised);
   d.setDate(d.getDate() + scaledInterval(revisionCount, confidence));
-  d.setHours(0, 0, 0, 0);
-  return d;
+  // Revisions become due at the start of an application day, not midnight.
+  return applicationDayStart(applicationDayKey(d));
 }
 
 export type RevisionBucket = 'overdue' | 'due_today' | 'upcoming' | 'not_started';
 
 export function revisionBucket(nextRevisionAt: string | null, revisionCount: number, today: Date): RevisionBucket {
   if (revisionCount === 0 || !nextRevisionAt) return 'not_started';
-  const t = new Date(today); t.setHours(0, 0, 0, 0);
-  const n = new Date(nextRevisionAt); n.setHours(0, 0, 0, 0);
-  const diff = Math.floor((n.getTime() - t.getTime()) / 86400000);
+  const diff = daysBetween(applicationDayKey(today), applicationDayKey(new Date(nextRevisionAt)));
   if (diff < 0) return 'overdue';
   if (diff === 0) return 'due_today';
   return 'upcoming';

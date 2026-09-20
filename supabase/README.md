@@ -10,6 +10,7 @@ available — by design, so nothing half-configured ever ships.
 | File | Purpose |
 | --- | --- |
 | `migrations/0001_my_upsc_prep_init.sql` | Complete schema: 13 user-owned tables + `profiles`, indexes, constraints, **Row Level Security with owner-only policies**. Idempotent (safe to re-run). |
+| `migrations/0002_lecture_ranges.sql` | Additive lecture range and per-lecture completion fields, with a data-preserving backfill from existing series progress. |
 | `../scripts/verify-migration.mjs` | Functional verifier — boots a real local Postgres (via npm `embedded-postgres`), emulates Supabase's `auth.uid()`, and proves RLS isolation between two users. |
 
 ## Verified behaviour (real Postgres 18, Supabase emulation)
@@ -26,8 +27,7 @@ available — by design, so nothing half-configured ever ships.
 
 **Option 1 — Dashboard (2 minutes):**
 1. Create a project at supabase.com (suggested name: `my-upsc-prep`, region `ap-south-1 (Mumbai)`).
-2. SQL Editor → New query → paste the full contents of
-   `supabase/migrations/0001_my_upsc_prep_init.sql` → Run.
+2. SQL Editor → New query → run the files in `supabase/migrations/` in numeric order. Existing projects can safely run only `0002_lecture_ranges.sql`.
 3. Project Settings → API: copy the **Project URL** and the **anon/public
    publishable key** (browser-safe — never the service_role key).
 

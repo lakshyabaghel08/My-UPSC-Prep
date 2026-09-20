@@ -6,7 +6,8 @@ import { syllabus } from '../data/syllabus';
 import { treeStats, type NodeStat } from '../store/selectors';
 import { Card, Modal, Field, RChip, StatusChip } from '../ui/components';
 import { useToast } from '../ui/toast';
-import type { ItemStatus, Confidence } from '../types';
+import type { ItemStatus, ItemType, Confidence } from '../types';
+import { hierarchyStatus } from '../lib/syllabusProgress';
 import { CONFIDENCE_LABELS, nextRevisionDate, rLabel } from '../lib/revision';
 import { todayKey, addDays, fmtTime } from '../lib/date';
 import { navigate } from '../ui/router';
@@ -23,7 +24,7 @@ export function Syllabus() {
   const [reviseItem, setReviseItem] = useState<{ id: string; type: string; title: string } | null>(null);
   const [taskItem, setTaskItem] = useState<{ id: string; type: string; title: string } | null>(null);
 
-  const { setItemStatus, bulkSetStatus, getProgress } = useStore();
+  const { setItemStatus, getProgress } = useStore();
   const { push } = useToast();
 
   const papers = syllabus.papers.filter((p) => (cat === 'all' ? true : p.category === cat));
@@ -69,13 +70,9 @@ export function Syllabus() {
 
   const expandedFor = (id: string) => (matches ? matches.has(id) : expanded.has(id));
 
-  const setStatus = (id: string, isLeaf: boolean, status: ItemStatus) => {
-    if (isLeaf) setItemStatus(id, 'subtopic', status);
-    else {
-      const ids = subtreeLeafIds(id);
-      bulkSetStatus(ids, 'subtopic', status);
-      push(`${status === 'completed' ? 'Marked' : 'Set'} ${ids.length} units · ${status.replace('_', ' ')}`, 'ok');
-    }
+  const setStatus = (id: string, type: ItemType, status: ItemStatus) => {
+    setItemStatus(id, type, status);
+    push(status === 'completed' ? 'Completion saved' : 'Completion cleared', 'ok');
   };
 
   const isExpanded = (id: string) => expandedFor(id);
@@ -83,7 +80,7 @@ export function Syllabus() {
   const renderRow = (id: string, type: string, title: string, desc: string, depth: number, stat?: NodeStat, isLeaf = false) => {
     const hasChildren = !isLeaf;
     const open = hasChildren && isExpanded(id);
-    const st = getProgress(id)?.status ?? 'not_started';
+    const st = hierarchyStatus(id, db.progress);
     const p = getProgress(id);
     return (
       <div key={id + type} className="tree-row" style={{ paddingLeft: 6 }}>
@@ -104,7 +101,7 @@ export function Syllabus() {
               <span className="t-pct">{stat.pct}%</span>
             </div>
           )}
-          <StatusToggle status={st} onSet={(s) => setStatus(id, isLeaf, s)} />
+          <StatusToggle status={st} onSet={(s) => setStatus(id, type as ItemType, s)} />
           <button className="icon-btn" style={{ width: 27, height: 27, fontSize: 13 }} title="Short notes" onClick={() => setNotesItem({ id, type, title })}>✎</button>
           {(type === 'topic' || type === 'subtopic') && (
             <button className="icon-btn" style={{ width: 27, height: 27, fontSize: 13 }} title="Log revision" onClick={() => setReviseItem({ id, type, title })}>↻</button>
@@ -198,56 +195,17 @@ export function Syllabus() {
   );
 }
 
-function subtreeLeafIds(rootId: string): string[] {
-  // paper -> subjects -> chapters -> topics -> subtopics (or topic-as-leaf)
-  const out: string[] = [];
-  const paper = syllabus.paperById.get(rootId);
-  if (paper) {
-    for (const s of syllabus.subjectsOf.get(paper.id) ?? []) for (const c of syllabus.chaptersOf.get(s.id) ?? []) for (const t of syllabus.topicsOf.get(c.id) ?? []) {
-      const subs = syllabus.subtopicsOf.get(t.id) ?? [];
-      if (subs.length) out.push(...subs.map((x) => x.id));
-      else out.push(t.id);
-    }
-    return out;
-  }
-  const subject = syllabus.subjectById.get(rootId);
-  if (subject) {
-    for (const c of syllabus.chaptersOf.get(subject.id) ?? []) for (const t of syllabus.topicsOf.get(c.id) ?? []) {
-      const subs = syllabus.subtopicsOf.get(t.id) ?? [];
-      if (subs.length) out.push(...subs.map((x) => x.id));
-      else out.push(t.id);
-    }
-    return out;
-  }
-  const chapter = syllabus.chapterById.get(rootId);
-  if (chapter) {
-    for (const t of syllabus.topicsOf.get(chapter.id) ?? []) {
-      const subs = syllabus.subtopicsOf.get(t.id) ?? [];
-      if (subs.length) out.push(...subs.map((x) => x.id));
-      else out.push(t.id);
-    }
-    return out;
-  }
-  const topic = syllabus.topicById.get(rootId);
-  if (topic) {
-    const subs = syllabus.subtopicsOf.get(topic.id) ?? [];
-    return subs.length ? subs.map((x) => x.id) : [topic.id];
-  }
-  return [rootId];
-}
-
 export function StatusToggle({ status, onSet }: { status: ItemStatus; onSet: (s: ItemStatus) => void }) {
-  const next: Record<ItemStatus, ItemStatus> = { not_started: 'in_progress', in_progress: 'completed', completed: 'not_started' };
-  const color = status === 'completed' ? 'var(--ok)' : status === 'in_progress' ? 'var(--warn)' : 'var(--text-faint)';
-  const glyph = status === 'completed' ? '●' : status === 'in_progress' ? '◐' : '○';
+  const completed = status === 'completed';
   return (
     <button
-      className="chip click"
-      style={{ color, borderColor: 'var(--line-strong)', fontWeight: 700 }}
-      title={`Status: ${status.replace('_', ' ')} (click to change)`}
-      onClick={() => onSet(next[status])}
+      className={`completion-toggle ${completed ? 'complete' : status === 'in_progress' ? 'partial' : ''}`}
+      title={completed ? 'Mark incomplete (also clears descendants)' : 'Mark complete (also completes descendants)'}
+      aria-pressed={completed}
+      onClick={() => onSet(completed ? 'not_started' : 'completed')}
     >
-      {glyph} {status === 'completed' ? 'Done' : status === 'in_progress' ? 'WIP' : 'To do'}
+      <span className="completion-box">{completed ? '✓' : status === 'in_progress' ? '–' : ''}</span>
+      {completed ? 'Complete' : status === 'in_progress' ? 'Partial' : 'Complete'}
     </button>
   );
 }

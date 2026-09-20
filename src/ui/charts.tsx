@@ -1,6 +1,6 @@
 /** Hand-rolled SVG charts — zero dependencies, theme-aware. */
 import React from 'react';
-import { WEEKDAY_LABELS, dateFromKey, fmtDuration } from '../lib/date';
+import { WEEKDAY_LABELS, dateFromKey, fmtDuration, todayKey } from '../lib/date';
 
 const GRID = 'var(--chart-grid)';
 
@@ -151,7 +151,7 @@ export function Donut({ segments, size = 130, thickness = 14, centerLabel, cente
 
 // ---------- Study heatmap (last 26 weeks) ----------
 export function Heatmap({ minutesByDay, weeks = 26 }: { minutesByDay: Map<string, number>; weeks?: number }) {
-  const today = new Date();
+  const today = dateFromKey(todayKey());
   const end = new Date(today);
   end.setDate(end.getDate() + (6 - end.getDay())); // end of current week (Sat)
   const cells: { key: string; minutes: number }[] = [];

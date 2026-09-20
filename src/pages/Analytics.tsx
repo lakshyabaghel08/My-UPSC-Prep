@@ -8,8 +8,10 @@ import {
   confidenceSplit, taskTrend, subjectProgressForPaper,
 } from '../store/selectors';
 import { syllabus } from '../data/syllabus';
-import { fmtDuration, todayKey, addDays } from '../lib/date';
+import { fmtDuration } from '../lib/date';
 import { navigate } from '../ui/router';
+import { daysUntilExam, examDatesFor } from '../config/exams';
+import { leafNodes } from '../lib/syllabusProgress';
 
 export function Analytics() {
   const { db } = useStore();
@@ -21,19 +23,21 @@ export function Analytics() {
   const trend = useMemo(() => taskTrend(db, 21), [db]);
   const geo = syllabus.papers.filter((p) => p.category === 'optional');
 
-  // exam countdown (CSE prelims ~ late May of target year; configurable-ish)
+  // Official dates are centralized; years without a configured official
+  // calendar deliberately show no speculative countdown.
   const examYear = db.settings.targetExamYear;
-  const prelimsDate = `${examYear}-05-25`;
-  const daysLeft = Math.round((new Date(prelimsDate).getTime() - new Date(todayKey()).getTime()) / 86400000);
-  const weeksLeft = Math.max(0, Math.floor(daysLeft / 7));
+  const examDates = examDatesFor(examYear);
+  const daysLeft = examDates ? daysUntilExam(examDates.prelims) : null;
+  const weeksLeft = daysLeft == null ? null : Math.max(0, Math.floor(daysLeft / 7));
 
   // pace model: completed subtopics per active week over last 8 weeks (by updatedAt)
   const velocity = useMemo(() => {
     const weeks = 8;
     const now = Date.now();
     const buckets = Array.from({ length: weeks }, () => 0);
+    const leaves = new Set(leafNodes().map((node) => node.id));
     for (const p of Object.values(db.progress)) {
-      if (p.status !== 'completed') continue;
+      if (p.status !== 'completed' || !leaves.has(p.itemId)) continue;
       const t = new Date(p.updatedAt).getTime();
       const wks = Math.floor((now - t) / (7 * 86400000));
       if (wks < weeks) buckets[weeks - 1 - wks]++;
@@ -66,7 +70,7 @@ export function Analytics() {
       </div>
 
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <Card className="stat-card"><div><div className="stat-value" style={{ color: daysLeft > 0 ? 'var(--accent)' : 'var(--bad)' }}>{daysLeft > 0 ? daysLeft : '—'}</div><div className="stat-label">Days to Prelims {examYear}</div><div className="stat-extra">{weeksLeft} weeks · assumed 25 May</div></div></Card>
+        <Card className="stat-card"><div><div className="stat-value" style={{ color: daysLeft != null && daysLeft > 0 ? 'var(--accent)' : 'var(--text-faint)' }}>{daysLeft != null && daysLeft > 0 ? daysLeft : '—'}</div><div className="stat-label">Days to Prelims {examYear}</div><div className="stat-extra">{examDates ? `${weeksLeft} weeks · official 23 May` : 'official date not configured'}</div></div></Card>
         <Card className="stat-card"><div><div className="stat-value">{stats.syllabus.pct}%</div><div className="stat-label">Syllabus covered</div><div className="stat-extra">{stats.syllabus.done} of {stats.syllabus.total} units</div></div></Card>
         <Card className="stat-card"><div><div className="stat-value">{velocity.avgPerWeek}</div><div className="stat-label">Units / week pace</div><div className="stat-extra">{velocity.weeksNeeded ? `~${velocity.weeksNeeded}w to finish` : 'log progress to estimate'}</div></div></Card>
         <Card className="stat-card"><div><div className="stat-value">{stats.streak}d</div><div className="stat-label">Streak</div><div className="stat-extra">{fmtDuration(stats.weekMinutes)} this week</div></div></Card>

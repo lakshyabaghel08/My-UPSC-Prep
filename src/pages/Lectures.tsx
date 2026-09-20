@@ -1,157 +1,162 @@
-/** Geography Optional Lecture Tracker — series-level lecture tracking with
- * PDF followed, short notes, revision and PYQ flags. */
-import React, { useMemo, useState } from 'react';
+/** Geography Optional — inclusive lecture ranges with per-lecture completion. */
+import React, { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
-import { Card, Empty, Modal, Field, Confirm, Bar } from '../ui/components';
+import { Bar, Card, Confirm, Empty, Field, Modal } from '../ui/components';
 import { useToast } from '../ui/toast';
 import { lectureSummary } from '../store/selectors';
 import { syllabus } from '../data/syllabus';
 import type { Lecture } from '../types';
-import { todayKey } from '../lib/date';
+import { completedLectureNumbers, lectureProgress, parseLectureRange } from '../lib/lectures';
 
 export function Lectures() {
-  const { db, addLecture, updateLecture, deleteLecture } = useStore();
-  const { push } = useToast();
+  const { db, updateLecture, deleteLecture } = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Lecture | null>(null);
   const [deleting, setDeleting] = useState<Lecture | null>(null);
   const [filterSubject, setFilterSubject] = useState('all');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const sum = lectureSummary(db);
+  const summary = lectureSummary(db);
   const geoSubjects = useMemo(() => {
-    const ids = syllabus.papers.filter((p) => p.category === 'optional').flatMap((p) => (syllabus.subjectsOf.get(p.id) ?? []).map((s) => s.title));
-    return [...new Set([...ids, ...db.lectures.map((l) => l.subject)])].sort();
+    const bundled = syllabus.papers
+      .filter((paper) => paper.category === 'optional')
+      .flatMap((paper) => (syllabus.subjectsOf.get(paper.id) ?? []).map((subject) => subject.title));
+    return [...new Set([...bundled, ...db.lectures.map((lecture) => lecture.subject)])].sort();
   }, [db.lectures]);
 
-  const lectures = useMemo(() => {
-    const arr = [...db.lectures].sort((a, b) => a.subject.localeCompare(b.subject) || a.lectureNo - b.lectureNo || a.title.localeCompare(b.title));
-    return filterSubject === 'all' ? arr : arr.filter((l) => l.subject === filterSubject);
+  const subjects = useMemo(() => {
+    const grouped = new Map<string, Lecture[]>();
+    for (const lecture of db.lectures) {
+      const list = grouped.get(lecture.subject) ?? [];
+      list.push(lecture);
+      grouped.set(lecture.subject, list);
+    }
+    return [...grouped.entries()]
+      .map(([subject, list]) => ({
+        subject,
+        list: list.sort((a, b) => a.rangeStart - b.rangeStart || a.title.localeCompare(b.title)),
+      }))
+      .filter((group) => filterSubject === 'all' || group.subject === filterSubject)
+      .sort((a, b) => a.subject.localeCompare(b.subject));
   }, [db.lectures, filterSubject]);
 
-  const bySubject = useMemo(() => {
-    const m = new Map<string, Lecture[]>();
-    for (const l of db.lectures) {
-      const arr = m.get(l.subject) ?? [];
-      arr.push(l);
-      m.set(l.subject, arr);
-    }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [db.lectures]);
+  const toggleExpanded = (id: string) => setExpanded((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
-  const toggleFlag = (l: Lecture, patch: Partial<Lecture>) => {
-    updateLecture(l.id, patch);
+  const toggleLecture = (series: Lecture, number: number) => {
+    const progress = lectureProgress(series);
+    const completed = new Set(progress.completed);
+    if (completed.has(number)) completed.delete(number); else completed.add(number);
+    const nextCompleted = [...completed].sort((a, b) => a - b);
+    const nextNumber = progress.numbers.find((item) => !completed.has(item)) ?? series.rangeEnd;
+    const status: Lecture['status'] = nextCompleted.length === 0
+      ? 'not_started'
+      : nextCompleted.length === progress.total ? 'completed' : 'in_progress';
+    const now = new Date().toISOString();
+    updateLecture(series.id, {
+      completedLectures: nextCompleted,
+      lectureNo: nextNumber,
+      status,
+      lastWatchedAt: now,
+      completedAt: status === 'completed' ? now : null,
+    });
   };
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>Geography Optional — Lecture Tracker</h1>
-          <div className="sub">{sum.series} series · {sum.completed}/{sum.total} lectures completed ({sum.pct}%) · {sum.notes} with short notes · {sum.revised} revised · {sum.pyqs} PYQs attempted</div>
+          <h1>Geography Optional — Lecture Series</h1>
+          <div className="sub">Watch → complete → continue with the next lecture · {summary.completed}/{summary.total} complete across {summary.series} series</div>
         </div>
         <button className="btn primary" onClick={() => setShowAdd(true)}>+ Add lecture series</button>
       </div>
 
-      <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <Card className="stat-card"><div><div className="stat-value">{sum.total - sum.completed}</div><div className="stat-label">Lectures remaining</div><div className="stat-extra">{sum.completed} of {sum.total} done</div></div></Card>
-        <Card className="stat-card"><div><div className="stat-value">{sum.notes}</div><div className="stat-label">Short notes made</div></div></Card>
-        <Card className="stat-card"><div><div className="stat-value">{sum.revised}</div><div className="stat-label">Revised</div></div></Card>
-        <Card className="stat-card"><div><div className="stat-value">{sum.pyqs}</div><div className="stat-label">PYQs attempted</div></div></Card>
+      <div className="grid cols-4 lecture-summary-grid">
+        <Card className="stat-card"><div><div className="stat-value">{summary.total - summary.completed}</div><div className="stat-label">Remaining</div><div className="stat-extra">{summary.completed} of {summary.total} lectures complete</div></div></Card>
+        <Card className="stat-card"><div><div className="stat-value">{summary.pct}%</div><div className="stat-label">Overall progress</div><div className="stat-extra">real lecture completion</div></div></Card>
+        <Card className="stat-card"><div><div className="stat-value">{summary.lecturesDone}/{summary.series}</div><div className="stat-label">Series completed</div></div></Card>
+        <Card className="stat-card"><div><div className="stat-value">{summary.revised}</div><div className="stat-label">Series revised</div><div className="stat-extra">{summary.pyqs} linked PYQs attempted</div></div></Card>
       </div>
 
       {db.lectures.length === 0 ? (
-        <Card><Empty icon="▶" title="No lecture series yet" hint="Add your coaching/YouTube lecture series and track completion, PDFs, notes, revisions & PYQs"
+        <Card><Empty icon="▶" title="No lecture series yet" hint="Add a title, subject and inclusive range such as 98-113."
           action={<button className="btn primary" onClick={() => setShowAdd(true)}>+ Add your first series</button>} /></Card>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="filters">
-            <span className="tiny muted">Filter:</span>
+        <>
+          <div className="filters lecture-filters">
+            <span className="tiny muted">Subject</span>
             <div className="seg">
-              <button className={filterSubject === 'all' ? 'active' : ''} onClick={() => setFilterSubject('all')}>All subjects</button>
-              {bySubject.map(([s]) => (
-                <button key={s} className={filterSubject === s ? 'active' : ''} onClick={() => setFilterSubject(s)}>{s}</button>
+              <button className={filterSubject === 'all' ? 'active' : ''} onClick={() => setFilterSubject('all')}>All</button>
+              {[...new Set(db.lectures.map((lecture) => lecture.subject))].sort().map((subject) => (
+                <button key={subject} className={filterSubject === subject ? 'active' : ''} onClick={() => setFilterSubject(subject)}>{subject}</button>
               ))}
             </div>
           </div>
-          {bySubject.filter(([s]) => filterSubject === 'all' || s === filterSubject).map(([subject, list]) => {
-            const doneLect = list.filter((l) => l.status === 'completed').reduce((a, l) => a + l.totalLectures, 0);
-            const totalLect = list.reduce((a, l) => a + l.totalLectures, 0);
-            const p = totalLect ? Math.round((doneLect / totalLect) * 100) : 0;
-            return (
-              <Card key={subject}>
-                <div className="card-head">
-                  <div className="row" style={{ gap: 9 }}>
-                    <span className="stat-ico" style={{ background: 'var(--geo-soft)', color: 'var(--geo)' }}>◈</span>
-                    <div><h3>{subject}</h3><div className="hint">{list.length} series</div></div>
+
+          <div className="lecture-subjects">
+            {subjects.map(({ subject, list }) => {
+              const subjectTotal = list.reduce((sum, item) => sum + lectureProgress(item).total, 0);
+              const subjectDone = list.reduce((sum, item) => sum + lectureProgress(item).count, 0);
+              const subjectPct = subjectTotal ? Math.round(subjectDone / subjectTotal * 100) : 0;
+              return (
+                <Card key={subject} className="lecture-subject-card">
+                  <div className="card-head lecture-subject-head">
+                    <div><h2>{subject}</h2><div className="hint">{list.length} series · {subjectDone}/{subjectTotal} lectures</div></div>
+                    <div className="lecture-subject-progress"><Bar value={subjectPct} tone="geo" /><b className="mono small">{subjectPct}%</b></div>
                   </div>
-                  <div className="row" style={{ gap: 10 }}>
-                    <div style={{ width: 130 }}><Bar value={p} tone="geo" /></div>
-                    <span className="small mono" style={{ fontWeight: 700, color: 'var(--geo)' }}>{p}%</span>
-                  </div>
-                </div>
-                <div className="card-pad" style={{ paddingTop: 10 }}>
-                  <div className="table-wrap">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Series</th><th>Lec #</th><th>PDF followed</th><th>Notes</th><th>Revised</th><th>PYQs</th><th>Status</th><th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((l) => (
-                          <tr key={l.id}>
-                            <td style={{ fontWeight: 600, minWidth: 160 }}>
-                              {l.title}
-                              {l.source && <div className="tiny muted">{l.source}</div>}
-                            </td>
-                            <td className="num">{l.lectureNo}/{l.totalLectures}</td>
-                            <td>{l.pdfFollowed ? <span className="chip geo" title={l.pdfFollowed}>PDF ✓</span> : <span className="chip">—</span>}</td>
-                            <td>
-                              <button className={`chip click ${l.shortNotesMade ? 'ok' : ''}`} onClick={() => toggleFlag(l, { shortNotesMade: !l.shortNotesMade })}>{l.shortNotesMade ? '✓ Made' : 'Make'}</button>
-                            </td>
-                            <td>
-                              <button className={`chip click ${l.revised ? 'ok' : ''}`} onClick={() => toggleFlag(l, { revised: !l.revised, revisionCount: l.revised ? l.revisionCount : l.revisionCount + 1 })}>
-                                {l.revised ? `✓ R${l.revisionCount}` : 'Revise'}
-                              </button>
-                            </td>
-                            <td>
-                              <span className="row" style={{ gap: 4 }}>
-                                <button className="btn xs" onClick={() => toggleFlag(l, { pyqsAttempted: Math.max(0, l.pyqsAttempted - 1) })}>−</button>
-                                <b className="mono">{l.pyqsAttempted}</b>
-                                <button className="btn xs" onClick={() => toggleFlag(l, { pyqsAttempted: l.pyqsAttempted + 1 })}>+</button>
+                  <div className="lecture-series-list">
+                    {list.map((series) => {
+                      const progress = lectureProgress(series);
+                      const open = expanded.has(series.id);
+                      const completed = new Set(completedLectureNumbers(series));
+                      return (
+                        <article key={series.id} className={`lecture-series ${open ? 'open' : ''}`}>
+                          <div className="lecture-series-row">
+                            <button className="lecture-expand" onClick={() => toggleExpanded(series.id)} aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${series.title}`}>›</button>
+                            <button className="lecture-series-main" onClick={() => toggleExpanded(series.id)}>
+                              <span className="lecture-series-title">{series.title}</span>
+                              <span className="lecture-series-meta">
+                                {series.rangeStart}–{series.rangeEnd} · {progress.count}/{progress.total} completed · {progress.pct}%
+                                {progress.next != null && <strong> · Next: Lecture {progress.next}</strong>}
                               </span>
-                            </td>
-                            <td>
-                              <select className="input input-sm" value={l.status} onChange={(e) => {
-                                const status = e.target.value as Lecture['status'];
-                                updateLecture(l.id, { status, completedAt: status === 'completed' ? new Date().toISOString() : null, lastWatchedAt: new Date().toISOString() });
-                              }}>
-                                <option value="not_started">Not started</option>
-                                <option value="in_progress">In progress</option>
-                                <option value="completed">Completed</option>
-                              </select>
-                            </td>
-                            <td>
-                              <div className="actions">
-                                <button className="icon-btn" style={{ width: 27, height: 27, fontSize: 12 }} title="Edit" onClick={() => setEditing(l)}>✎</button>
-                                <button className="icon-btn" style={{ width: 27, height: 27, fontSize: 12 }} title="Delete" onClick={() => setDeleting(l)}>🗑</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              {series.chapter && <span className="tiny muted">{series.chapter}</span>}
+                            </button>
+                            <div className="lecture-series-bar"><Bar value={progress.pct} tone="geo" /></div>
+                            {series.notesLink && <a className="btn sm ghost" href={series.notesLink} target="_blank" rel="noreferrer">Notes ↗</a>}
+                            <button className="icon-btn" title="Edit series" onClick={() => setEditing(series)}>✎</button>
+                            <button className="icon-btn" title="Delete series" onClick={() => setDeleting(series)}>🗑</button>
+                          </div>
+                          {open && (
+                            <div className="lecture-checklist">
+                              {progress.numbers.map((number) => {
+                                const done = completed.has(number);
+                                return (
+                                  <button key={number} className={`lecture-check ${done ? 'done' : ''}`} onClick={() => toggleLecture(series, number)}>
+                                    <span>{done ? '✓' : ''}</span>
+                                    Lecture {number}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <LectureForm open={showAdd} onClose={() => setShowAdd(false)} subjects={geoSubjects} />
-      {editing && <LectureForm open editing={editing} onClose={() => setEditing(null)} subjects={geoSubjects} />}
-      <Confirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={() => deleting && deleteLecture(deleting.id)} title="Delete lecture series?" body={`"${deleting?.title}" will be removed permanently.`} />
+      <LectureForm key={showAdd ? 'add-open' : 'add-closed'} open={showAdd} onClose={() => setShowAdd(false)} subjects={geoSubjects} />
+      {editing && <LectureForm key={editing.id} open editing={editing} onClose={() => setEditing(null)} subjects={geoSubjects} />}
+      <Confirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={() => deleting && deleteLecture(deleting.id)} title="Delete lecture series?" body={`“${deleting?.title}” and its lecture completion will be removed.`} />
     </>
   );
 }
@@ -159,25 +164,30 @@ export function Lectures() {
 function LectureForm({ open, onClose, editing, subjects }: { open: boolean; onClose: () => void; editing?: Lecture | null; subjects: string[] }) {
   const { addLecture, updateLecture } = useStore();
   const { push } = useToast();
+  const saving = useRef(false);
   const [title, setTitle] = useState(editing?.title ?? '');
-  const [subject, setSubject] = useState(editing?.subject ?? subjects[0] ?? 'Geomorphology');
+  const [subject, setSubject] = useState(editing?.subject ?? subjects[0] ?? 'Geography Optional');
   const [chapter, setChapter] = useState(editing?.chapter ?? '');
-  const [lectureNo, setLectureNo] = useState(String(editing?.lectureNo ?? 1));
-  const [totalLectures, setTotalLectures] = useState(String(editing?.totalLectures ?? 10));
-  const [source, setSource] = useState(editing?.source ?? '');
-  const [pdfFollowed, setPdfFollowed] = useState(editing?.pdfFollowed ?? '');
-  const [shortNotesMade, setShortNotes] = useState(editing?.shortNotesMade ?? false);
+  const [range, setRange] = useState(editing ? `${editing.rangeStart}-${editing.rangeEnd}` : '');
   const [notesLink, setNotesLink] = useState(editing?.notesLink ?? '');
+  const parsed = parseLectureRange(range);
 
   const submit = () => {
-    if (!title.trim()) { push('Title required', 'bad'); return; }
+    if (saving.current) return;
+    if (!title.trim()) { push('Series title is required', 'bad'); return; }
+    if (!parsed) { push('Enter a valid range such as 98-113 (end must be at least start)', 'bad'); return; }
+    saving.current = true;
+    const previousCompleted = editing ? completedLectureNumbers(editing) : [];
+    const completedLectures = previousCompleted.filter((number) => parsed.numbers.includes(number));
     const payload = {
-      title: title.trim(), subject, chapter,
-      lectureNo: Number(lectureNo) || 1, totalLectures: Number(totalLectures) || 1,
-      source, pdfFollowed, shortNotesMade, notesLink,
+      title: title.trim(), subject, chapter: chapter.trim(), notesLink: notesLink.trim(),
+      rangeStart: parsed.start, rangeEnd: parsed.end, totalLectures: parsed.numbers.length,
+      completedLectures,
+      lectureNo: parsed.numbers.find((number) => !completedLectures.includes(number)) ?? parsed.end,
+      status: (completedLectures.length === 0 ? 'not_started' : completedLectures.length === parsed.numbers.length ? 'completed' : 'in_progress') as Lecture['status'],
     };
-    if (editing) { updateLecture(editing.id, payload); push('Series updated', 'ok'); }
-    else { addLecture(payload); push('Lecture series added', 'ok'); }
+    if (editing) { updateLecture(editing.id, payload); push('Lecture series updated', 'ok'); }
+    else { addLecture(payload); push(`${parsed.numbers.length} lectures created`, 'ok'); }
     onClose();
   };
 
@@ -185,24 +195,26 @@ function LectureForm({ open, onClose, editing, subjects }: { open: boolean; onCl
     <Modal open={open} onClose={onClose} title={editing ? 'Edit lecture series' : 'Add lecture series'} wide footer={
       <>
         <button className="btn ghost" onClick={onClose}>Cancel</button>
-        <button className="btn primary" onClick={submit}>{editing ? 'Save' : 'Add series'}</button>
+        <button className="btn primary" onClick={submit}>{editing ? 'Save changes' : 'Create series'}</button>
       </>
     }>
-      <Field label="Series / lecture title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Geomorphology — Lecture 4: Plate Tectonics" autoFocus /></Field>
+      <Field label="Series / lecture title"><input className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Biogeography" autoFocus /></Field>
       <div className="form-grid">
         <Field label="Subject">
-          <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
-            {subjects.map((s) => <option key={s}>{s}</option>)}
+          <select className="input" value={subject} onChange={(event) => setSubject(event.target.value)}>
+            {subjects.map((item) => <option key={item}>{item}</option>)}
+            {!subjects.includes(subject) && <option>{subject}</option>}
           </select>
         </Field>
-        <Field label="Chapter (optional)"><input className="input" value={chapter} onChange={(e) => setChapter(e.target.value)} placeholder="e.g. Earth's Interior" /></Field>
-        <Field label="Lectures watched / in series #"><input type="number" min={1} className="input" value={lectureNo} onChange={(e) => setLectureNo(e.target.value)} /></Field>
-        <Field label="Total lectures in series"><input type="number" min={1} className="input" value={totalLectures} onChange={(e) => setTotalLectures(e.target.value)} /></Field>
-        <Field label="Source / faculty"><input className="input" value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Unacademy — Sumit Sir / YouTube" /></Field>
-        <Field label="PDF / booklet followed"><input className="input" value={pdfFollowed} onChange={(e) => setPdfFollowed(e.target.value)} placeholder="e.g. coaching booklet Ch. 3" /></Field>
-        <Field label="Short notes link (optional)"><input className="input" value={notesLink} onChange={(e) => setNotesLink(e.target.value)} placeholder="local folder or note app link" /></Field>
+        <Field label="Chapter (optional)"><input className="input" value={chapter} onChange={(event) => setChapter(event.target.value)} placeholder="e.g. Biogeography" /></Field>
+        <Field label="Lecture range">
+          <input className={`input ${range && !parsed ? 'invalid' : ''}`} value={range} onChange={(event) => setRange(event.target.value)} placeholder="98-113" inputMode="numeric" />
+          <span className={`field-help ${range && !parsed ? 'bad-text' : ''}`}>
+            {parsed ? `${parsed.start}–${parsed.end} · ${parsed.numbers.length} lectures will be generated` : 'Inclusive numeric range, for example 98-113'}
+          </span>
+        </Field>
+        <Field label="Short notes link (optional)"><input className="input" value={notesLink} onChange={(event) => setNotesLink(event.target.value)} placeholder="https://…" /></Field>
       </div>
-      <label className="checkbox-row"><input type="checkbox" checked={shortNotesMade} onChange={(e) => setShortNotes(e.target.checked)} /> Short notes made for this series</label>
     </Modal>
   );
 }

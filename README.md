@@ -12,19 +12,18 @@ lets you sign in on any device: same app, same features, your data synced and vi
 
 | Module | What it does |
 | --- | --- |
-| **Dashboard** | Tasks due, syllabus %, revision queue, test avg, streak, 7-day hours, paper progress, trends |
-| **Operational Syllabus** | Paper → Subject → Chapter → Topic → Subtopic tree (9 papers, 37 subjects, 88 chapters, 257 topics, **1000 subtopics**) with per-item status, short notes, revision logging and task planning |
-| **Daily Planner** | Time blocks, quick-add + templates, overdue carry-forward, week strip, syllabus-linked tasks |
+| **Dashboard** | Action-first command centre with today's plan, real continue-study activity, Geography Optional position, study graphs and analytics |
+| **Operational Syllabus** | Paper → Subject → Chapter → Topic → Subtopic tree (9 papers, 37 subjects, 88 chapters, 257 topics, **1000 subtopics**) with cascading completion, short notes, revision logging and task planning |
+| **Daily Planner** | Time blocks, multiline quick-add + templates, overdue carry-forward, week strip, syllabus-linked tasks |
 | **Calendar** | Month grid of tasks, events, revision dues and tests |
-| **Geography Lecture Tracker** | Series-level tracking: lectures watched/total, PDF followed, short notes made, revised, PYQs attempted |
+| **Geography Lecture Tracker** | Inclusive lecture ranges with expandable one-click completion and preserved series progress |
 | **Revision R1–R5** | Spaced repetition (3d → 7d → 21d → 45d × confidence 0.5/1/1.5), overdue/today/upcoming queue, full log |
-| **PYQ Tracker** | Previous-year questions tagged to syllabus topics with attempt/master states |
 | **Test Tracker & Analytics** | Prelims mocks (UPSC negative marking) + Mains tests with score/accuracy/attempt-rate trends |
 | **Answer Writing** | Daily answer log with marks, word counts and strength/improvement tags |
 | **Current Affairs** | Daily capture with subject categories, Prelims/Mains relevance and revision flags |
-| **Study Timer** | Pomodoro + stopwatch, sessions feed Study Hours |
-| **Study Hours** | Consistency heatmap, streaks, weekly trend, daily habits |
-| **Prep Analytics** | Countdown, completion velocity, weakest areas, revision health, test performance |
+| **Focus Workspace** | Flip Clock Pomodoro + stopwatch, breaks, soundscapes, mindfulness bell, fullscreen and mini player; sessions feed Study Hours |
+| **Study Hours** | Focus-session consistency heatmap, streaks and weekly trend |
+| **Prep Analytics** | Official 2027 countdown, completion velocity, weakest areas, revision health, test performance |
 | **Settings** | Theme, daily target, backup/restore, reset tools |
 
 ## Run it
@@ -40,6 +39,8 @@ Production build + preview:
 npm run build
 npm run preview    # serves dist/ at http://localhost:4173
 ```
+
+The application day rolls over at **4:00 AM local time** across planning, focus totals, streaks and analytics.
 
 Tests (no browser needed):
 
