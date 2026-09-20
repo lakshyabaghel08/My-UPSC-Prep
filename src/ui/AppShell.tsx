@@ -5,6 +5,7 @@ import { useStore } from '../store/store';
 import { dashboardStats } from '../store/selectors';
 import { downloadBackup } from '../store/db';
 import { useToast } from './toast';
+import { isCloudConfigured } from '../lib/supabase';
 
 const NAV: { section: string; items: { to: string; icon: string; label: string; badge?: 'revision' | 'tasks' }[] }[] = [
   {
@@ -133,7 +134,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {syncStatus.syncing ? '⟳ Syncing…' : syncStatus.pending > 0 ? `⚠ ${syncStatus.pending} pending` : syncStatus.lastError ? '⚠ Sync issue' : '☁ Synced'}
             </button>
           ) : (
-            <button className="chip click" title="Running in local mode — sign in from Settings to sync" onClick={() => navigateTo('/settings')}>☰ Local mode</button>
+            <button
+              className="chip click"
+              title={isCloudConfigured
+                ? 'Running in local mode — sign in from Settings to sync'
+                : 'This build runs fully on this device — cloud sync is not configured in it'}
+              onClick={() => navigateTo('/settings')}
+            >☰ Local mode</button>
           )}
           <span className="tiny muted mono">{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
           <button className="icon-btn" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? '☀' : '☾'}</button>
