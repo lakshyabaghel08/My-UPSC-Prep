@@ -55,6 +55,17 @@ check('sign in / create account tabs present', t.includes('Sign in') && t.includ
 check('local-mode escape hatch offered', t.includes('Continue on this device'));
 check('dashboard is NOT accessible pre-auth', !t.includes('preparation at a glance'));
 check('syllabus module is NOT accessible pre-auth', !t.includes('Operational Syllabus'));
+
+// Remember-me option: present on the sign-in tab, checked by default, hidden
+// on the create-account tab (signup flow is unchanged).
+const rememberRow = () => [...document.querySelectorAll('label.checkbox-row')]
+  .find((el) => /remember me/i.test(el.textContent || ''));
+check('remember me checkbox present on sign-in tab', Boolean(rememberRow()));
+check('remember me checked by default', rememberRow()?.querySelector('input[type="checkbox"]')?.checked === true);
+const signupTab = [...document.querySelectorAll('.seg button')].find((b) => b.textContent?.includes('Create account'));
+if (signupTab) { signupTab.click(); await sleep(150); }
+check('remember me hidden on create-account tab', !rememberRow());
+
 check('no page errors', errors.length === 0, errors[0] ?? '');
 
 console.log(failed === 0 ? '\nAUTH GATE TEST PASSED' : `\nAUTH GATE TEST FAILED (${failed})`);

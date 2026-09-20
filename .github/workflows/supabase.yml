@@ -6,7 +6,7 @@ name: Supabase operations
 #                        + publishable key (browser-safe; service_role is
 #                        never read or printed).
 #   mode = e2e-tests  → run scripts/e2e-cloud-test.mjs against the live
-#                        project (32 checks incl. RLS isolation).
+#                        project (35 checks incl. RLS isolation).
 #
 # Requires repository secrets:
 #   SUPABASE_ACCESS_TOKEN          (bootstrap; optional cleanup for e2e)

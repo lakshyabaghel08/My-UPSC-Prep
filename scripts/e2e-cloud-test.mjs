@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * End-to-end cloud tests against the LIVE Supabase project (Phase 10).
- * Covers: signup, login, logout, session persistence, CRUD for every module,
- * RLS isolation between two real users, and the bulk migration round-trip.
+ * Covers: signup, login, logout, session persistence, "remember me"
+ * (session-only vs persistent) semantics, CRUD for every module, RLS
+ * isolation between two real users, and the bulk migration round-trip.
  *
  * Config resolution order:
  *   env VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY
@@ -215,6 +216,37 @@ async function main() {
   await sbA.auth.signOut();
   await sbB.auth.signOut();
 
+  // ---------- 9b. "Remember me" session semantics (per-device persistence) ----------
+  // The app's remember-me OFF path signs in through a client created with
+  // persistSession: false — the session lives in that client's memory only and
+  // is never written to browser storage. Node has no localStorage, so one
+  // shared in-memory store below stands in for a single browser profile and a
+  // fresh client instance stands in for a page reload on that device.
+  const device = (() => {
+    const m = new Map();
+    return {
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => { m.set(k, String(v)); },
+      removeItem: (k) => { m.delete(k); },
+      clear: () => m.clear(),
+      key: (i) => [...m.keys()][i] ?? null,
+      get length() { return m.size; },
+    };
+  })();
+  const sbNoRemember = createClient(url, key, { auth: { persistSession: false, storageKey: 'mup-e2e-device' } });
+  const noRem = await sbNoRemember.auth.signInWithPassword({ email: emailA, password: PASSWORD });
+  check('32. remember-me OFF sign-in returns a working session for the same account', noRem.data.session?.user?.id === uidA, noRem.error?.message);
+  const freshLoad1 = createClient(url, key, { auth: { persistSession: true, storage: device, storageKey: 'mup-e2e-device' } });
+  const freshSess1 = await freshLoad1.auth.getSession();
+  check('33. remember-me OFF leaves NO session stored on the device', !freshSess1.data.session);
+  // control: the default (remember-me ON) flow DOES persist for the next load
+  const remLogin = await freshLoad1.auth.signInWithPassword({ email: emailA, password: PASSWORD });
+  const freshLoad2 = createClient(url, key, { auth: { persistSession: true, storage: device, storageKey: 'mup-e2e-device' } });
+  const freshSess2 = await freshLoad2.auth.getSession();
+  check('34. default sign-in persists the session on the device', freshSess2.data.session?.user?.id === uidA, remLogin.error?.message);
+  await freshLoad2.auth.signOut();
+  await sbNoRemember.auth.signOut();
+
   // ---------- 10. cleanup ----------
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (token) {
@@ -224,7 +256,7 @@ async function main() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: `delete from auth.users where email like 'mup-test-%@example.com';` }),
       });
-      check('32. test users cleaned up', res.ok);
+        check('35. test users cleaned up', res.ok);
     } catch (e) {
       console.log(`  ⚠ cleanup failed (${e.message}) — test users remain, harmless.`);
     }
