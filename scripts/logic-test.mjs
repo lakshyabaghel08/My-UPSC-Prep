@@ -205,6 +205,59 @@ const { migrate } = mod;
 const mig = migrate({ version: 0, tasks: [{ id: 'x', name: 'legacy' }] });
 check('migrate fills defaults', mig.settings.targetExamYear === 2027 && mig.tasks.length === 1 && mig.version === mod.DB_VERSION);
 
+// persistent Focus Workspace runtime: exact-once focus logs; no break/unfinished logs
+await act(async () => { root.unmount(); });
+localStorage.clear();
+const realNow = Date.now;
+let fakeNow = realNow();
+Date.now = () => fakeNow;
+const realWindowInterval = window.setInterval;
+const realWindowClearInterval = window.clearInterval;
+let intervalTick = null;
+let intervalId = 0;
+window.setInterval = (callback) => { intervalTick = callback; return ++intervalId; };
+window.clearInterval = () => {};
+let timerRef = null;
+let timerStoreRef = null;
+function TimerProbe() {
+  timerRef = mod.useFocusTimer();
+  timerStoreRef = useStore();
+  return React.createElement('div', null, timerRef.state.status);
+}
+const timerContainer = dom.window.document.createElement('div');
+dom.window.document.body.appendChild(timerContainer);
+const timerRoot = createRoot(timerContainer);
+await act(async () => {
+  timerRoot.render(React.createElement(StoreProvider, null,
+    React.createElement(mod.ToastProvider, null,
+      React.createElement(mod.FocusTimerProvider, null, React.createElement(TimerProbe)))));
+});
+await act(async () => { timerRef.setSettings({ focusMinutes: 1, breakMinutes: 1, longBreakMinutes: 1, sessionsBeforeLongBreak: 2, soundEnabled: false, mindfulnessEnabled: false }); });
+await act(async () => { timerRef.start(); });
+const focusCompletionTick = intervalTick;
+fakeNow += 60_000;
+await act(async () => { focusCompletionTick(); });
+await act(async () => { focusCompletionTick(); }); // stale/racing completion callback
+check('completed Pomodoro focus logs exactly once', timerStoreRef.db.focusSessions.length === 1 && timerStoreRef.db.focusSessions[0].durationMinutes === 1);
+await act(async () => { timerRef.start(); }); // short break
+const breakCompletionTick = intervalTick;
+fakeNow += 60_000;
+await act(async () => { breakCompletionTick(); });
+check('completed breaks never enter focus sessions', timerStoreRef.db.focusSessions.length === 1 && timerRef.state.phase === 'focus');
+await act(async () => { timerRef.setMode('pomodoro'); timerRef.start(); });
+fakeNow += 20_000;
+await act(async () => { timerRef.pause(); timerRef.reset(); });
+check('pausing and resetting unfinished focus does not log', timerStoreRef.db.focusSessions.length === 1);
+await act(async () => { timerRef.setMode('stopwatch'); });
+await act(async () => { timerRef.start(); });
+fakeNow += 61_000;
+await act(async () => { timerRef.finish(); });
+check('finished stopwatch work logs through the same focus-session store', timerStoreRef.db.focusSessions.length === 2 && timerStoreRef.db.focusSessions[1].sessionType === 'focus');
+await act(async () => { timerRoot.unmount(); });
+Date.now = realNow;
+window.setInterval = realWindowInterval;
+window.clearInterval = realWindowClearInterval;
+
 fs.rmSync(outfile, { force: true });
 console.log(failed === 0 ? '\nLOGIC TESTS PASSED' : `\nLOGIC TESTS FAILED (${failed})`);
 process.exit(failed ? 1 : 0);

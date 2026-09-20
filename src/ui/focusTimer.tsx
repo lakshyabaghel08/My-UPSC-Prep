@@ -129,6 +129,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   }, [state.running]);
 
   const playBell = useCallback((kind: 'time-up' | 'mindfulness') => {
+    if (typeof Audio === 'undefined') return;
     const audio = new Audio(audioUrl(kind === 'time-up' ? 'time-up.mp3' : 'mindfulness-bell.mp3'));
     audio.volume = Math.max(0, Math.min(1, settingsRef.current.volume / 100));
     void audio.play().catch(() => {});
@@ -227,7 +228,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   const setMode = useCallback((mode: TimerMode) => setState((timer) => ({ ...defaultTimer(), mode, taskName: timer.taskName, completedFocusCycles: timer.completedFocusCycles })), []);
 
   const start = useCallback(() => {
-    ensureAmbient();
+    if (settingsRef.current.soundEnabled) ensureAmbient();
     setState((timer) => {
       if (timer.running) return timer;
       const currentElapsed = elapsedFor(timer);
