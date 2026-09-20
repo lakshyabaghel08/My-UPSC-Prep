@@ -33,7 +33,15 @@ jobs:
         run: npm install
 
       - name: Build
-        run: npm run build -- --base=/My-UPSC-Prep/
+        # Unset repo secrets expand to EMPTY strings here, and in Vite an empty
+        # process env var overrides the committed .env.production — which used to
+        # silently ship a no-cloud build where sign-in could never work. Fall back
+        # to the committed publishable values whenever the secrets are empty.
+        run: |
+          [ -n "$VITE_SUPABASE_URL" ] || VITE_SUPABASE_URL="$(sed -n 's/^VITE_SUPABASE_URL=//p' .env.production | head -n1)"
+          [ -n "$VITE_SUPABASE_PUBLISHABLE_KEY" ] || VITE_SUPABASE_PUBLISHABLE_KEY="$(sed -n 's/^VITE_SUPABASE_PUBLISHABLE_KEY=//p' .env.production | head -n1)"
+          export VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY
+          npm run build -- --base=/My-UPSC-Prep/
         env:
           # Cloud sync config (publishable/browser-safe values only).
           # Secrets take precedence over the committed .env.production.

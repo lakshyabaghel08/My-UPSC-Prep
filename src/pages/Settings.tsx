@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { Card, CardHead, Confirm, Field } from '../ui/components';
 import { useToast } from '../ui/toast';
+import { isCloudConfigured } from '../lib/supabase';
 import { downloadBackup, parseBackup, newDatabase, DB_VERSION } from '../store/db';
 import type { MupDatabase } from '../types';
 import { syllabus } from '../data/syllabus';
@@ -92,7 +93,7 @@ export function Settings() {
                 </div>
                 <p className="tiny muted">Sign-in happens on the start screen. "Re-import" replaces cloud data with this device's data (useful after restoring a backup file locally).</p>
               </>
-            ) : (
+            ) : isCloudConfigured ? (
               <>
                 <p className="small soft">
                   You're using <b style={{ color: 'var(--text)' }}>local mode</b> — everything lives in this browser only.
@@ -100,6 +101,11 @@ export function Settings() {
                 </p>
                 <button className="btn primary sm" onClick={() => { window.location.hash = '/'; window.location.reload(); }}>☁ Sign in to enable sync</button>
               </>
+            ) : (
+              <p className="small soft">
+                This build runs <b style={{ color: 'var(--text)' }}>100% on this device</b> — cloud sync isn't
+                configured in it, so there's no account to sign in to. Your data stays in this browser.
+              </p>
             )}
           </div>
         </Card>

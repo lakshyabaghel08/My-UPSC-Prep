@@ -3,9 +3,11 @@ import React, { useState } from 'react';
 import { useStore } from '../store/store';
 import { Modal } from '../ui/components';
 import { isCloudConfigured } from '../lib/supabase';
+import { useToast } from '../ui/toast';
 
 export function AuthPage() {
   const { signIn, signUp, continueLocal, db } = useStore();
+  const { push } = useToast();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +32,10 @@ export function AuthPage() {
     setBusy(false);
     if (res.error) setError(res.error);
     else if (res.needsConfirmation) setInfo('Check your inbox — confirm your email, then sign in.');
+    else if (mode === 'signin') push(
+      rememberMe ? 'Signed in — your data is syncing' : 'Signed in for this session only — nothing stored on this device',
+      'ok');
+    else push('Account created — your data is syncing', 'ok');
   };
 
   return (
