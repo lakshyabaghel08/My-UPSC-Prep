@@ -49,7 +49,7 @@ export function AuthPage() {
           </div>
         </div>
 
-        <h1 style={{ fontSize: 20, margin: '14px 0 2px' }}>Sign in to sync</h1>
+        <h1 style={{ fontSize: 20.5, margin: '14px 0 2px' }}>Sign in to sync</h1>
         <p className="small muted" style={{ marginBottom: 14 }}>
           Your preparation data syncs privately to your own account via Supabase —
           protected by Row Level Security. Without signing in, the app stays fully usable on this device.
