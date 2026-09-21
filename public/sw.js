@@ -1,8 +1,8 @@
 /* PREPTRACK — offline-first service worker.
  * Cache-first for built assets; network-first fallback for index.html so
  * updates land on next online visit. No external requests are made. */
-const CACHE = 'preptrack-cache-v3';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-maskable-512.png', './icons/favicon-32.png', './logo/preptrack-wordmark-transparent.png'];
+const CACHE = 'preptrack-cache-v4';
+const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-maskable-512.png', './icons/favicon-32.png', './logo/preptrack-wordmark-light.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

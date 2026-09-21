@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="brand">
           <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" />
           <div className="brand-copy">
-            <img className="brand-wordmark-img" src={`${import.meta.env.BASE_URL}logo/preptrack-wordmark-transparent.png`} alt="PREPTRACK" />
+            <img className="brand-wordmark-img" src={`${import.meta.env.BASE_URL}logo/preptrack-wordmark-light.png`} alt="PREPTRACK" />
             <div className="brand-sub">CSE {db.settings.targetExamYear} · {db.settings.optional}</div>
           </div>
           <button className="sidebar-collapse-btn" onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? '›' : '‹'}</button>

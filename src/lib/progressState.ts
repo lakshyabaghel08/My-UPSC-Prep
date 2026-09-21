@@ -23,6 +23,19 @@ export const PROGRESS_LABEL: Record<ItemStatus, string> = {
   completed: 'Completed',
 };
 
+/** State the preparation toggle should show for a node.
+ *
+ * A node's *derived* (rollup) status is authoritative whenever it is past
+ * To Do — completing or partially doing children must be reflected. But when
+ * the rollup is still To Do we fall back to the node's own stored state, so an
+ * explicit "mark In Progress" on an untouched parent is immediately visible and
+ * survives refresh instead of being silently re-derived back to To Do.
+ */
+export function displayedProgressStatus(stored: ItemStatus | null | undefined, derived: ItemStatus): ItemStatus {
+  if (derived !== 'not_started') return normalizeItemStatus(derived);
+  return normalizeItemStatus(stored);
+}
+
 /** Next state in the To Do → In Progress → Completed → To Do cycle. */
 export function nextProgressState(status: ItemStatus | undefined): ItemStatus {
   if (status === 'not_started') return 'in_progress';
