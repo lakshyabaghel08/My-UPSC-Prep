@@ -118,6 +118,32 @@ check('progress maps migrate without dropping records',
 check('an unrelated boolean setting is never coerced',
   normalizeItemStatus(undefined) === 'not_started' && normalizeItemStatus('dark') === 'not_started');
 
+// ---------- syllabus three-state toggle cycle ----------
+const { displayedProgressStatus } = mod;
+check('explicit In Progress on untouched parent is visible (not re-derived to To Do)',
+  displayedProgressStatus('in_progress', 'not_started') === 'in_progress');
+check('rollup wins once children are started/completed',
+  displayedProgressStatus('in_progress', 'completed') === 'completed'
+  && displayedProgressStatus('not_started', 'in_progress') === 'in_progress');
+check('untouched node shows To Do', displayedProgressStatus(null, 'not_started') === 'not_started');
+
+// store-level: parent cycles To Do -> In Progress -> Completed -> To Do
+{
+  const cycledb = mod.newDatabase();
+  const topic = mod.syllabus.topics.find((t2) => (mod.syllabus.subtopicsOf.get(t2.id) ?? []).length > 1);
+  const setStatus = (stt) => {
+    const res = mod.applyHierarchyStatus(cycledb.progress, topic.id, stt);
+    cycledb.progress = res.progress;
+  };
+  const shown = () => displayedProgressStatus(cycledb.progress[topic.id]?.status, mod.hierarchyStatus(topic.id, cycledb.progress));
+  check('parent starts To Do', shown() === 'not_started');
+  setStatus('in_progress'); check('parent -> In Progress persists', shown() === 'in_progress');
+  setStatus('completed'); check('parent -> Completed cascades', shown() === 'completed'
+    && (mod.syllabus.subtopicsOf.get(topic.id) ?? []).every((sub) => cycledb.progress[sub.id]?.status === 'completed'));
+  setStatus('not_started'); check('parent -> To Do clears', shown() === 'not_started'
+    && (mod.syllabus.subtopicsOf.get(topic.id) ?? []).every((sub) => cycledb.progress[sub.id]?.status === 'not_started'));
+}
+
 // ---------- application-day session pruning ----------
 const pruneDb = mod.newDatabase();
 pruneDb.focusSessions = [

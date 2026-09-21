@@ -8,7 +8,7 @@ import { Card, Modal, Field, RChip, StatusChip } from '../ui/components';
 import { useToast } from '../ui/toast';
 import type { ItemStatus, ItemType, Confidence } from '../types';
 import { hierarchyStatus } from '../lib/syllabusProgress';
-import { nextProgressState, normalizeItemStatus, PROGRESS_LABEL } from '../lib/progressState';
+import { displayedProgressStatus, nextProgressState, normalizeItemStatus, PROGRESS_LABEL } from '../lib/progressState';
 import { CONFIDENCE_LABELS, nextRevisionDate, rLabel } from '../lib/revision';
 import { todayKey, addDays, fmtTime } from '../lib/date';
 import { navigate } from '../ui/router';
@@ -73,7 +73,7 @@ export function Syllabus() {
 
   const setStatus = (id: string, type: ItemType, status: ItemStatus) => {
     setItemStatus(id, type, status);
-    push(status === 'completed' ? 'Completion saved' : 'Completion cleared', 'ok');
+    push(STATUS_TOAST[status], 'ok');
   };
 
   const isExpanded = (id: string) => expandedFor(id);
@@ -81,8 +81,8 @@ export function Syllabus() {
   const renderRow = (id: string, type: string, title: string, desc: string, depth: number, stat?: NodeStat, isLeaf = false) => {
     const hasChildren = !isLeaf;
     const open = hasChildren && isExpanded(id);
-    const st = hierarchyStatus(id, db.progress);
     const p = getProgress(id);
+    const st = displayedProgressStatus(p?.status, hierarchyStatus(id, db.progress));
     return (
       <div key={id + type} className="tree-row" style={{ paddingLeft: 6 }}>
         {hasChildren ? (
@@ -195,6 +195,13 @@ export function Syllabus() {
     </>
   );
 }
+
+/** Three-state confirmation copy — replaces the old binary "saved/cleared". */
+const STATUS_TOAST: Record<ItemStatus, string> = {
+  not_started: 'Marked To Do',
+  in_progress: 'Marked In Progress',
+  completed: 'Marked Completed',
+};
 
 /** Three-state preparation control: To Do → In Progress → Completed → To Do.
  * Each click stores the next real state (and reconciles the hierarchy). */
