@@ -1,11 +1,12 @@
 /** Daily Planner / Tasks — day-focused planner with time blocks and quick add. */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { Card, Empty, Modal, Field, Confirm } from '../ui/components';
 import { useToast } from '../ui/toast';
 import type { Task, Priority, PriorityBucket } from '../types';
 import { todayKey, addDays, dateFromKey, formatDateLong, fmtTime, relDay, nowTimeKey } from '../lib/date';
 import { syllabus } from '../data/syllabus';
+import { parseQuickTasks } from '../lib/tasks';
 
 const SUBJECT_MAPPINGS = ['Prelims GS1', 'CSAT', 'GS-I', 'GS-II', 'GS-III', 'GS-IV', 'Essay', 'Optional', 'Current Affairs'];
 const PRIORITY_CHIPS: { value: Priority; label: string; cls: string }[] = [
@@ -16,13 +17,14 @@ const PRIORITY_CHIPS: { value: Priority; label: string; cls: string }[] = [
 ];
 
 export function Tasks() {
-  const { db, addTask, updateTask, toggleTask, deleteTask } = useStore();
+  const { db, addTask, addTasks, updateTask, toggleTask, deleteTask } = useStore();
   const { push } = useToast();
   const [date, setDate] = useState(todayKey());
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [quick, setQuick] = useState('');
+  const quickAddLock = useRef(false);
 
   const dayTasks = useMemo(() => db.tasks.filter((t) => t.deadline === date), [db.tasks, date]);
   const scheduled = dayTasks.filter((t) => t.startTime && t.status !== 'completed').sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
@@ -36,10 +38,14 @@ export function Tasks() {
   }, [date]);
 
   const addQuick = () => {
-    const name = quick.trim();
-    if (!name) return;
-    addTask({ name, deadline: date, subjectMapping: guessMapping(name) });
+    if (quickAddLock.current) return;
+    const names = parseQuickTasks(quick);
+    if (!names.length) return;
+    quickAddLock.current = true;
+    addTasks(names.map((name) => ({ name, deadline: date, subjectMapping: guessMapping(name) })));
     setQuick('');
+    push(`${names.length} task${names.length === 1 ? '' : 's'} added`, 'ok');
+    window.setTimeout(() => { quickAddLock.current = false; }, 0);
   };
 
   const toggleDone = (t: Task) => {
@@ -51,7 +57,7 @@ export function Tasks() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head planner-head">
         <div>
           <h1>Daily Planner</h1>
           <div className="sub">{formatDateLong(date)} · {dayTasks.length} tasks · {done.length} done · {progressPct}%</div>
@@ -66,19 +72,14 @@ export function Tasks() {
       </div>
 
       {/* week strip */}
-      <div className="row" style={{ gap: 7, marginBottom: 14, flexWrap: 'nowrap', overflowX: 'auto' }}>
+      <div className="planner-week-strip">
         {weekStrip.map((d) => {
           const count = db.tasks.filter((t) => t.deadline === d && t.status !== 'completed').length;
           const isSel = d === date;
           const isToday = d === todayKey();
           const dw = dateFromKey(d).toLocaleDateString('en-IN', { weekday: 'short' });
           return (
-            <button key={d} onClick={() => setDate(d)} className="card" style={{
-              padding: '7px 12px', minWidth: 74, cursor: 'pointer', textAlign: 'center',
-              borderColor: isSel ? 'var(--accent)' : isToday ? 'var(--line-strong)' : 'var(--line)',
-              boxShadow: isSel ? '0 0 0 1px var(--accent)' : undefined,
-              background: isSel ? 'var(--accent-soft)' : 'var(--surface)',
-            }}>
+            <button key={d} onClick={() => setDate(d)} className={`planner-day ${isSel ? 'selected' : ''} ${isToday ? 'today' : ''}`}>
               <div className="tiny" style={{ fontWeight: 700, color: isSel ? 'var(--accent)' : 'var(--text-faint)' }}>{dw}</div>
               <div style={{ fontWeight: 800, fontSize: 15 }}>{dateFromKey(d).getDate()}</div>
               <div className="tiny muted">{count ? `${count} due` : '—'}</div>
@@ -87,16 +88,23 @@ export function Tasks() {
         })}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
+      <div className="grid planner-layout">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* quick add */}
-          <Card card-pad className="card-pad">
-            <div className="row">
-              <input className="input" placeholder={`Quick add task for ${formatDateLong(date)}…`} value={quick} onChange={(e) => setQuick(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addQuick()} />
-              <button className="btn primary" onClick={addQuick}>Add</button>
+          <Card className="card-pad planner-quick-add">
+            <div className="quick-add-heading">
+              <div><b>Quick Add</b><span>One task per line</span></div>
+              <span className="kbd">Ctrl ↵</span>
             </div>
-            <div className="row wrap" style={{ marginTop: 9, gap: 6 }}>
+            <div className="quick-add-input">
+              <textarea className="input" rows={3} placeholder={`Add one or several tasks for ${formatDateLong(date)}…`} value={quick} onChange={(e) => setQuick(e.target.value)}
+                onKeyDown={(e) => {
+                  const submitShortcut = e.key === 'Enter' && (e.ctrlKey || e.metaKey || (!e.shiftKey && !quick.includes('\n')));
+                  if (submitShortcut) { e.preventDefault(); addQuick(); }
+                }} />
+              <button className="btn primary" onClick={addQuick}>Add {parseQuickTasks(quick).length > 1 ? `${parseQuickTasks(quick).length} tasks` : 'task'}</button>
+            </div>
+            <div className="row wrap" style={{ marginTop: 10, gap: 6 }}>
               <span className="tiny muted">Templates:</span>
               {['📰 Newspaper + notes (60m)', '✍️ 2 answers (45m)', '↻ Revision hour (60m)', '🧮 CSAT practice (45m)', '🗺 Map practice (20m)'].map((tpl) => (
                 <button key={tpl} className="chip click" onClick={() => addTask({ name: tpl.replace(/^[^ ]+ /, ''), deadline: date, subjectMapping: guessMapping(tpl), estimateMin: Number(tpl.match(/\((\d+)m\)/)?.[1] ?? 0) || null })}>{tpl}</button>

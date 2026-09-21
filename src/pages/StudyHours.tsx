@@ -1,30 +1,17 @@
-/** Study Hours / Consistency — heatmap, trends, streaks and habit tracking. */
-import React, { useMemo, useState } from 'react';
+/** Study Hours / Consistency — focus-session heatmap, trends and streaks. */
+import React, { useMemo } from 'react';
 import { useStore } from '../store/store';
-import { Card, CardHead, Empty, Confirm } from '../ui/components';
+import { Card, CardHead, Empty } from '../ui/components';
 import { Heatmap, ColumnsChart, Sparkline } from '../ui/charts';
 import { fmtDuration, todayKey, addDays, startOfWeek, WEEKDAY_LABELS, computeStreak, dateFromKey } from '../lib/date';
-import { useToast } from '../ui/toast';
-
-const HABIT_COLORS = ['#6d8cff', '#2dd4bf', '#fbbf24', '#f87171', '#ec4899', '#38bdf8'];
+import { focusMinutesByApplicationDay } from '../store/selectors';
 
 export function StudyHours() {
-  const { db, addHabit, deleteHabit, toggleHabit } = useStore();
-  const { push } = useToast();
-  const [habitName, setHabitName] = useState('');
-  const [deletingHabit, setDeletingHabit] = useState<string | null>(null);
+  const { db } = useStore();
 
   const today = todayKey();
 
-  const minutesByDay = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of db.focusSessions) {
-      if (s.sessionType !== 'focus' || !s.completed) continue;
-      const key = todayKey(new Date(s.startedAt));
-      m.set(key, (m.get(key) ?? 0) + s.durationMinutes);
-    }
-    return m;
-  }, [db.focusSessions]);
+  const minutesByDay = useMemo(() => focusMinutesByApplicationDay(db), [db.focusSessions]);
 
   const days30 = useMemo(() => Array.from({ length: 30 }, (_, i) => {
     const key = addDays(today, -(29 - i));
@@ -108,53 +95,6 @@ export function StudyHours() {
         </Card>
       </div>
 
-      <Card>
-        <CardHead title="Daily habits" hint="rituals that compound" right={
-          <form className="row" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (habitName.trim()) { addHabit(habitName.trim(), HABIT_COLORS[db.habits.length % HABIT_COLORS.length]); setHabitName(''); push('Habit added', 'ok'); } }}>
-            <input className="input input-sm" style={{ width: 170 }} placeholder="New habit…" value={habitName} onChange={(e) => setHabitName(e.target.value)} />
-            <button className="btn sm" type="submit">+ Add</button>
-          </form>
-        } />
-        <div className="card-pad" style={{ paddingTop: 10 }}>
-          {db.habits.length === 0 ? <Empty icon="⚑" title="No habits yet" hint="e.g. Newspaper, 2 answers, Map practice, Revision hour" /> : (
-            <div className="table-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Habit</th>
-                    {Array.from({ length: 7 }, (_, i) => <th key={i} style={{ textAlign: 'center' }}>{WEEKDAY_LABELS[dateFromKey(addDays(startOfWeek(today), i)).getDay()]}</th>)}
-                    <th style={{ textAlign: 'center' }}>30d</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {db.habits.map((h) => {
-                    const last7done = Array.from({ length: 7 }, (_, i) => db.habitCompletions.some((c) => c.habitId === h.id && c.date === addDays(startOfWeek(today), i)));
-                    const done30 = Array.from({ length: 30 }, (_, i) => db.habitCompletions.some((c) => c.habitId === h.id && c.date === addDays(today, -i))).filter(Boolean).length;
-                    return (
-                      <tr key={h.id}>
-                        <td><span className="row" style={{ gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: h.color }} /><b>{h.name}</b></span></td>
-                        {last7done.map((d, i) => (
-                          <td key={i} style={{ textAlign: 'center' }}>
-                            <button onClick={() => toggleHabit(h.id, addDays(startOfWeek(today), i))}
-                              style={{ width: 22, height: 22, borderRadius: 7, border: d ? 'none' : '2px solid var(--line-strong)', background: d ? h.color : 'transparent', cursor: 'pointer', color: '#fff', fontSize: 11 }}>
-                              {d ? '✓' : ''}
-                            </button>
-                          </td>
-                        ))}
-                        <td style={{ textAlign: 'center' }}><b className="mono">{done30}</b></td>
-                        <td><div className="actions"><button className="icon-btn" style={{ width: 27, height: 27, fontSize: 12 }} onClick={() => setDeletingHabit(h.id)}>🗑</button></div></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      <Confirm open={!!deletingHabit} onClose={() => setDeletingHabit(null)} onConfirm={() => deletingHabit && deleteHabit(deletingHabit)} title="Delete habit?" body="The habit and its completion history will be removed." />
     </>
   );
 }

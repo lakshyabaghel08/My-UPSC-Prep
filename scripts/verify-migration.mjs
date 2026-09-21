@@ -1,14 +1,18 @@
 /**
- * Functional verification of supabase/migrations/0001_my_upsc_prep_init.sql
+ * Functional verification of every SQL file in supabase/migrations/
  * against a REAL local Postgres (npm embedded-postgres), emulating Supabase:
  *   - auth.users table + auth.uid() reading request.jwt.claims (like Supabase)
  *   - two test users; asserts RLS isolation and CRUD under user context
  */
 import EmbeddedPostgres from 'embedded-postgres';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 
-const MIGRATION = '/home/user/My-UPSC-Prep/supabase/migrations/0001_my_upsc_prep_init.sql';
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
+const MIGRATIONS = fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.endsWith('.sql')).sort();
 
 const pg = new EmbeddedPostgres({
   databaseDir: '/tmp/pgtest/data',
@@ -53,23 +57,45 @@ async function main() {
   const { rows: r2 } = await admin.query(`select id from auth.users offset 1 limit 1;`);
   const mallory = r2[0].id;
 
-  // ---- run the migration ----
-  const sql = fs.readFileSync(MIGRATION, 'utf8');
+  // ---- run every migration in order ----
+  const migrationSql = MIGRATIONS.map((file) => [file, fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8')]);
+  const sql = migrationSql.map(([, contents]) => contents).join('\n\n');
+  let legacyLectureId = '';
   try {
-    await admin.query(sql);
-    check('migration executes cleanly on real Postgres', true);
+    for (let index = 0; index < migrationSql.length; index++) {
+      if (index === 1) {
+        const { rows: legacy } = await admin.query(`
+          insert into public.lectures (user_id,title,subject,lecture_no,total_lectures,status)
+          values ($1,'Legacy series','Geography',4,8,'in_progress') returning id
+        `, [alice]);
+        legacyLectureId = legacy[0].id;
+      }
+      await admin.query(migrationSql[index][1]);
+    }
+    check(`${MIGRATIONS.length} migrations execute cleanly on real Postgres`, true);
   } catch (e) {
-    check('migration executes cleanly on real Postgres', false, e.message);
+    check('migrations execute cleanly on real Postgres', false, e.message);
     throw e;
   }
 
-  // idempotency: run again — must not fail (if not exists everywhere)
+  if (legacyLectureId) {
+    const { rows: legacy } = await admin.query(`select range_start, range_end, completed_lectures from public.lectures where id=$1`, [legacyLectureId]);
+    check('lecture migration preserves legacy progress', legacy[0]?.range_start === 1 && legacy[0]?.range_end === 8 && JSON.stringify(legacy[0]?.completed_lectures) === JSON.stringify([1, 2, 3]));
+  }
+
+  // idempotency: run again — must not fail
   try {
     await admin.query(sql);
-    check('migration is re-runnable (idempotent)', true);
+    check('migrations are re-runnable (idempotent)', true);
   } catch (e) {
-    check('migration is re-runnable (idempotent)', false, e.message);
+    check('migrations are re-runnable (idempotent)', false, e.message);
   }
+  const { rows: lectureColumns } = await admin.query(`
+    select column_name from information_schema.columns
+    where table_schema='public' and table_name='lectures'
+      and column_name in ('range_start','range_end','completed_lectures')
+  `);
+  check('lecture range columns exist', lectureColumns.length === 3);
 
   const asUser = async (userId, fn) => {
     const c = new Client({ connectionString: 'postgres://postgres:postgres@localhost:54329/mup' });

@@ -199,8 +199,14 @@ export interface Lecture {
   /** maps to Geography Optional chapter/subject title. */
   subject: string;
   chapter: string;
+  /** Current/next lecture pointer retained for backwards compatibility. */
   lectureNo: number;
   totalLectures: number;
+  /** Inclusive lecture-number range for this series. */
+  rangeStart: number;
+  rangeEnd: number;
+  /** Individual lecture numbers completed inside the range. */
+  completedLectures: number[];
   /** source platform/institute e.g. "Unacademy — Sumit Sir" */
   source: string;
   /** PDF/booklet followed. */

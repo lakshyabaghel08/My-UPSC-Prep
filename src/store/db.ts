@@ -2,9 +2,10 @@
  * debounced saves, import/export (backup/restore), and reactive subscriptions. */
 import type { MupDatabase } from '../types';
 import { todayKey } from '../lib/date';
+import { normalizeLectureProgress } from '../lib/lectures';
 
 const DB_KEY = 'mup.db.v1';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 function defaultDb(): MupDatabase {
   return {
@@ -54,7 +55,7 @@ export function migrate(raw: unknown): MupDatabase {
     focusSessions: db.focusSessions ?? [],
     habits: db.habits ?? [],
     habitCompletions: db.habitCompletions ?? [],
-    lectures: db.lectures ?? [],
+    lectures: (db.lectures ?? []).map((lecture) => normalizeLectureProgress(lecture)),
     currentAffairs: db.currentAffairs ?? [],
     answers: db.answers ?? [],
     version: DB_VERSION,

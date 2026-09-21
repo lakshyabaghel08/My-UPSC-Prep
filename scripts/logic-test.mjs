@@ -57,7 +57,7 @@ check('confidence Low scales ×0.5', scaledInterval(4, 1) === 22);
 check('confidence High scales ×1.5', scaledInterval(4, 3) === 67);
 check('confidence Medium ×1', scaledInterval(2, 2) === 7);
 const next = nextRevisionDate(new Date('2026-01-01T10:00:00'), 1, 2);
-check('next revision = +3d at midnight', next.toISOString().slice(0, 10) === '2026-01-04');
+check('next revision = +3 application days at 4:00 AM', next.toISOString().slice(0, 10) === '2026-01-04' && next.getHours() === 4);
 check('bucket: not started', revisionBucket(null, 0, new Date()) === 'not_started');
 const future = new Date(Date.now() + 5 * 86400000).toISOString();
 const past = new Date(Date.now() - 5 * 86400000).toISOString();
@@ -69,12 +69,28 @@ check('rLabel', rLabel(0) === 'Not revised' && rLabel(3) === 'R3');
 const { todayKey, addDays, daysBetween, computeStreak, fmtDuration } = mod;
 const t = todayKey();
 check('todayKey format', /^\d{4}-\d{2}-\d{2}$/.test(t));
+check('3:59 AM belongs to previous application day', todayKey(new Date(2026, 8, 20, 3, 59, 59)) === '2026-09-19');
+check('4:00 AM starts the new application day', todayKey(new Date(2026, 8, 20, 4, 0, 0)) === '2026-09-20');
+const boundaryDb = mod.newDatabase();
+boundaryDb.focusSessions = [
+  { id: 'before', startedAt: new Date(2026, 8, 20, 3, 59).toISOString(), durationMinutes: 10, sessionType: 'focus', completed: true, taskId: null, subject: '', linkedTopicId: null, notes: '' },
+  { id: 'at', startedAt: new Date(2026, 8, 20, 4, 0).toISOString(), durationMinutes: 20, sessionType: 'focus', completed: true, taskId: null, subject: '', linkedTopicId: null, notes: '' },
+];
+const boundaryTotals = mod.focusMinutesByApplicationDay(boundaryDb);
+check('daily study totals roll over precisely at 4:00 AM', boundaryTotals.get('2026-09-19') === 10 && boundaryTotals.get('2026-09-20') === 20);
 check('addDays across month', addDays('2026-01-30', 3) === '2026-02-02');
 check('daysBetween', daysBetween('2026-01-01', '2026-01-31') === 30);
 check('fmtDuration', fmtDuration(225) === '3h 45m' && fmtDuration(45) === '45m');
 const streakSet = new Set([t, addDays(t, -1), addDays(t, -2)]);
 check('streak counts consecutive incl. today', computeStreak(streakSet, t) === 3);
 check('streak survives inactive today', computeStreak(new Set([addDays(t, -1), addDays(t, -2)]), t) === 2);
+const { parseQuickTasks, parseLectureRange, examDatesFor } = mod;
+check('multiline Quick Add creates one trimmed task per non-empty line', JSON.stringify(parseQuickTasks('  Revise Fundamental Rights  \n\nComplete Geography Lecture 99\n Read today\'s newspaper\nPractice Ethics answers  ')) === JSON.stringify(['Revise Fundamental Rights', 'Complete Geography Lecture 99', "Read today's newspaper", 'Practice Ethics answers']));
+check('single-line Quick Add remains valid', JSON.stringify(parseQuickTasks('Read Laxmikanth')) === JSON.stringify(['Read Laxmikanth']));
+const range = parseLectureRange('98-113');
+check('lecture range 98-113 generates exactly 16 numbers', range?.numbers.length === 16 && range.numbers[0] === 98 && range.numbers[15] === 113);
+check('malformed and descending lecture ranges are rejected', parseLectureRange('113-98') === null && parseLectureRange('98 to 113') === null);
+check('official UPSC CSE 2027 dates are centralized', examDatesFor(2027)?.prelims === '2027-05-23' && examDatesFor(2027)?.mainsCommencement === '2027-08-20');
 
 // ---------- store: full workflow ----------
 const { StoreProvider, useStore } = mod;
@@ -106,6 +122,9 @@ await act(async () => { storeRef.addTask({ name: 'Read Laxmikanth Ch.1', deadlin
 check('task added', storeRef.db.tasks.length === 1 && storeRef.db.tasks[0].status === 'upcoming');
 await act(async () => { storeRef.toggleTask(storeRef.db.tasks[0].id, true); });
 check('task completed', storeRef.db.tasks[0].status === 'completed' && storeRef.db.tasks[0].completedAt);
+const multilineNames = parseQuickTasks('Revise Fundamental Rights\nComplete Geography Lecture 99\n\nRead today\'s newspaper\nPractice Ethics answers');
+await act(async () => { storeRef.addTasks(multilineNames.map((name) => ({ name, deadline: t }))); });
+check('multiline Quick Add writes exactly four separate tasks', storeRef.db.tasks.length === 5 && storeRef.db.tasks.slice(1).every((task) => !task.name.includes('\n')));
 
 // progress + revision flow
 const { syllabus } = mod;
@@ -131,6 +150,26 @@ await act(async () => {
 });
 function s2Set(id) { storeRef.setItemStatus(id, 'subtopic', 'completed'); }
 check('rollup: topic completed when all subs done', statusOf(someSub.topicId, storeRef.db) === 'completed');
+check('rollup writes deterministic parent state', storeRef.db.progress[someSub.topicId]?.status === 'completed');
+const topicForCascade = syllabus.topics.find((topic) => (syllabus.subtopicsOf.get(topic.id) ?? []).length > 1);
+await act(async () => { storeRef.setItemStatus(topicForCascade.id, 'topic', 'not_started'); });
+check('topic incomplete cascades to every subtopic', (syllabus.subtopicsOf.get(topicForCascade.id) ?? []).every((sub) => storeRef.db.progress[sub.id]?.status === 'not_started'));
+await act(async () => { storeRef.setItemStatus(topicForCascade.id, 'topic', 'completed'); });
+check('topic complete cascades to every subtopic and reaches 100%', (syllabus.subtopicsOf.get(topicForCascade.id) ?? []).every((sub) => storeRef.db.progress[sub.id]?.status === 'completed') && treeStats(storeRef.db).get(topicForCascade.id)?.pct === 100);
+const chapterForCascade = syllabus.chapterById.get(topicForCascade.chapterId);
+await act(async () => { storeRef.setItemStatus(chapterForCascade.id, 'chapter', 'completed'); });
+check('chapter complete cascades through topics/subtopics', treeStats(storeRef.db).get(chapterForCascade.id)?.pct === 100 && storeRef.db.progress[chapterForCascade.id]?.status === 'completed');
+const subjectForCascade = syllabus.subjectById.get(chapterForCascade.subjectId);
+await act(async () => { storeRef.setItemStatus(subjectForCascade.id, 'subject', 'completed'); });
+check('subject complete cascades through chapters', treeStats(storeRef.db).get(subjectForCascade.id)?.pct === 100);
+const paperForCascade = syllabus.paperById.get(subjectForCascade.paperId);
+await act(async () => { storeRef.setItemStatus(paperForCascade.id, 'paper', 'completed'); });
+check('paper complete cascades through the entire hierarchy', treeStats(storeRef.db).get(paperForCascade.id)?.pct === 100 && storeRef.db.progress[paperForCascade.id]?.status === 'completed');
+const childToClear = (syllabus.subtopicsOf.get(topicForCascade.id) ?? [])[0];
+await act(async () => { storeRef.setItemStatus(childToClear.id, 'subtopic', 'not_started'); });
+check('child change recalculates all parent states and percentages', storeRef.db.progress[topicForCascade.id]?.status === 'in_progress' && storeRef.db.progress[chapterForCascade.id]?.status === 'in_progress' && storeRef.db.progress[subjectForCascade.id]?.status === 'in_progress' && storeRef.db.progress[paperForCascade.id]?.status === 'in_progress' && treeStats(storeRef.db).get(topicForCascade.id)?.pct < 100);
+await act(async () => { storeRef.setItemStatus(paperForCascade.id, 'paper', 'not_started'); });
+check('paper incomplete clears all descendants without contradiction', treeStats(storeRef.db).get(paperForCascade.id)?.pct === 0 && storeRef.db.progress[paperForCascade.id]?.status === 'not_started');
 
 // focus session + streak
 await act(async () => { storeRef.addFocusSession({ startedAt: new Date().toISOString(), durationMinutes: 90, taskName: 'Geo P1', sessionType: 'focus', completed: true }); });
@@ -147,22 +186,77 @@ const { prelimsAnalytics } = mod;
 const pa = prelimsAnalytics(storeRef.db);
 check('prelims analytics computed', pa.count === 1 && pa.avgScore === Math.round(((120 - 13.2) / 200) * 100));
 
-// lectures
-await act(async () => { storeRef.addLecture({ title: 'Plate Tectonics L1', subject: 'Geomorphology', totalLectures: 12, lectureNo: 1 }); });
-await act(async () => { storeRef.updateLecture(storeRef.db.lectures[0].id, { status: 'completed', shortNotesMade: true }); });
+// lecture ranges + individual completion
+await act(async () => { storeRef.addLecture({ title: 'Biogeography', subject: 'Geography Optional', rangeStart: 98, rangeEnd: 113, totalLectures: 16, lectureNo: 98, completedLectures: [] }); });
+const lecture = storeRef.db.lectures[0];
+check('lecture series stores generated inclusive range', lecture.rangeStart === 98 && lecture.rangeEnd === 113 && lecture.totalLectures === 16);
+await act(async () => { storeRef.updateLecture(lecture.id, { completedLectures: [98], lectureNo: 99, status: 'in_progress' }); });
 const { lectureSummary } = mod;
 const ls = lectureSummary(storeRef.db);
-check('lecture tracker summary', ls.total === 12 && ls.completed === 12 && ls.notes === 1);
+check('one-click lecture completion updates series analytics', ls.total === 16 && ls.completed === 1 && ls.pct === 6);
 
 // persistence round-trip
 await act(async () => { await new Promise((r) => setTimeout(r, 250)); }); // allow debounced save
 const saved = JSON.parse(localStorage.getItem('mup.db.v1'));
-check('db persisted to localStorage', saved && saved.tasks.length === 1 && saved.progress[someSub.id]?.revisionCount === 1);
+check('db persisted to localStorage', saved && saved.tasks.length === 5 && saved.progress[someSub.id]?.revisionCount === 1);
 
 // migration
 const { migrate } = mod;
 const mig = migrate({ version: 0, tasks: [{ id: 'x', name: 'legacy' }] });
-check('migrate fills defaults', mig.settings.targetExamYear === 2027 && mig.tasks.length === 1 && mig.version === 1);
+check('migrate fills defaults', mig.settings.targetExamYear === 2027 && mig.tasks.length === 1 && mig.version === mod.DB_VERSION);
+
+// persistent Focus Workspace runtime: exact-once focus logs; no break/unfinished logs
+await act(async () => { root.unmount(); });
+localStorage.clear();
+const realNow = Date.now;
+let fakeNow = realNow();
+Date.now = () => fakeNow;
+const realWindowInterval = window.setInterval;
+const realWindowClearInterval = window.clearInterval;
+let intervalTick = null;
+let intervalId = 0;
+window.setInterval = (callback) => { intervalTick = callback; return ++intervalId; };
+window.clearInterval = () => {};
+let timerRef = null;
+let timerStoreRef = null;
+function TimerProbe() {
+  timerRef = mod.useFocusTimer();
+  timerStoreRef = useStore();
+  return React.createElement('div', null, timerRef.state.status);
+}
+const timerContainer = dom.window.document.createElement('div');
+dom.window.document.body.appendChild(timerContainer);
+const timerRoot = createRoot(timerContainer);
+await act(async () => {
+  timerRoot.render(React.createElement(StoreProvider, null,
+    React.createElement(mod.ToastProvider, null,
+      React.createElement(mod.FocusTimerProvider, null, React.createElement(TimerProbe)))));
+});
+await act(async () => { timerRef.setSettings({ focusMinutes: 1, breakMinutes: 1, longBreakMinutes: 1, sessionsBeforeLongBreak: 2, soundEnabled: false, mindfulnessEnabled: false }); });
+await act(async () => { timerRef.start(); });
+const focusCompletionTick = intervalTick;
+fakeNow += 60_000;
+await act(async () => { focusCompletionTick(); });
+await act(async () => { focusCompletionTick(); }); // stale/racing completion callback
+check('completed Pomodoro focus logs exactly once', timerStoreRef.db.focusSessions.length === 1 && timerStoreRef.db.focusSessions[0].durationMinutes === 1);
+await act(async () => { timerRef.start(); }); // short break
+const breakCompletionTick = intervalTick;
+fakeNow += 60_000;
+await act(async () => { breakCompletionTick(); });
+check('completed breaks never enter focus sessions', timerStoreRef.db.focusSessions.length === 1 && timerRef.state.phase === 'focus');
+await act(async () => { timerRef.setMode('pomodoro'); timerRef.start(); });
+fakeNow += 20_000;
+await act(async () => { timerRef.pause(); timerRef.reset(); });
+check('pausing and resetting unfinished focus does not log', timerStoreRef.db.focusSessions.length === 1);
+await act(async () => { timerRef.setMode('stopwatch'); });
+await act(async () => { timerRef.start(); });
+fakeNow += 61_000;
+await act(async () => { timerRef.finish(); });
+check('finished stopwatch work logs through the same focus-session store', timerStoreRef.db.focusSessions.length === 2 && timerStoreRef.db.focusSessions[1].sessionType === 'focus');
+await act(async () => { timerRoot.unmount(); });
+Date.now = realNow;
+window.setInterval = realWindowInterval;
+window.clearInterval = realWindowClearInterval;
 
 fs.rmSync(outfile, { force: true });
 console.log(failed === 0 ? '\nLOGIC TESTS PASSED' : `\nLOGIC TESTS FAILED (${failed})`);

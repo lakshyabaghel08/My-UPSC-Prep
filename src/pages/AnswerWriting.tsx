@@ -4,7 +4,7 @@ import { useStore } from '../store/store';
 import { Card, CardHead, Empty, Modal, Field, Confirm } from '../ui/components';
 import { useToast } from '../ui/toast';
 import type { AnswerEntry } from '../types';
-import { todayKey, dateFromKey } from '../lib/date';
+import { addDays, todayKey, dateFromKey } from '../lib/date';
 import { LineChart } from '../ui/charts';
 
 const STRENGTH_TAGS = ['Good intro', 'Data used', 'Diagram/map', 'Balanced view', 'Crisp structure', 'Examples', 'Committee/ARC', 'Strong conclusion'];
@@ -22,7 +22,7 @@ export function AnswerWriting() {
     const withMarks = db.answers.filter((a) => a.marksObtained != null && a.maxMarks);
     return withMarks.length ? Math.round(withMarks.reduce((s, a) => s + (a.marksObtained! / a.maxMarks!) * 100, 0) / withMarks.length) : 0;
   })();
-  const thisWeek = db.answers.filter((a) => a.date >= new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)).length;
+  const thisWeek = db.answers.filter((a) => a.date >= addDays(todayKey(), -6)).length;
 
   return (
     <>
@@ -38,7 +38,7 @@ export function AnswerWriting() {
         <Card>
           <CardHead title="Score trend" hint="last 20 answers (% of max marks)" />
           <div className="card-pad" style={{ paddingTop: 10 }}>
-            {last20.length < 2 ? <Empty icon="✎" title="Log 2+ answers to see the trend" hint="Daily answer practice is the single highest-leverage mains habit" /> : (
+            {last20.length < 2 ? <Empty icon="✎" title="Log 2+ answers to see the trend" hint="Daily answer practice is among the highest-leverage Mains exercises" /> : (
               <LineChart yMax={100} suffix="%" series={[{ name: 'Score %', color: 'var(--geo)', points: last20.map((a) => Math.round((a.marksObtained ?? 0) / (a.maxMarks || 1) * 100)) }]} xLabels={last20.map((a) => a.date.slice(5))} />
             )}
           </div>

@@ -1,190 +1,223 @@
-/** Dashboard — your UPSC preparation at a glance. */
+/** Dashboard — a calm, action-first command centre backed only by real data. */
 import React, { useMemo } from 'react';
 import { useStore } from '../store/store';
 import { navigate } from '../ui/router';
-import { dashboardStats, paperStats, taskTrend, confidenceSplit } from '../store/selectors';
-import { Card, CardHead, Bar, Empty, RChip } from '../ui/components';
-import { ColumnsChart, HBars, LineChart, Donut } from '../ui/charts';
-import { WEEKDAY_LABELS, todayKey, relDay, fmtDuration } from '../lib/date';
-import { syllabus, itemTitle } from '../data/syllabus';
+import { confidenceSplit, dashboardStats, lectureSummary, paperStats, taskTrend } from '../store/selectors';
+import { Bar, Card, CardHead, Empty, RChip } from '../ui/components';
+import { ColumnsChart, Donut, HBars, LineChart } from '../ui/charts';
+import { fmtDuration, relDay, todayKey, WEEKDAY_LABELS } from '../lib/date';
+import { itemTitle, syllabus } from '../data/syllabus';
+import { lectureProgress } from '../lib/lectures';
+import { daysUntilExam, examDatesFor } from '../config/exams';
 
 export function Dashboard() {
   const { db } = useStore();
   const stats = useMemo(() => dashboardStats(db), [db]);
   const trend = useMemo(() => taskTrend(db, 14), [db]);
-  const conf = useMemo(() => confidenceSplit(db), [db]);
+  const confidence = useMemo(() => confidenceSplit(db), [db]);
   const papers = useMemo(() => paperStats(db), [db]);
+  const lectures = useMemo(() => lectureSummary(db), [db]);
   const today = todayKey();
 
   const todaysTasks = db.tasks
-    .filter((t) => t.deadline <= today && t.status !== 'completed')
-    .sort((a, b) => a.deadline.localeCompare(b.deadline) || (a.startTime?.localeCompare(b.startTime ?? '') ?? 0))
-    .slice(0, 7);
+    .filter((task) => task.deadline <= today && task.status !== 'completed')
+    .sort((a, b) => a.deadline.localeCompare(b.deadline) || (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99'));
+  const todaysDone = db.tasks.filter((task) => task.deadline === today && task.status === 'completed');
 
-  const revisionDue = Object.values(db.progress)
-    .filter((p) => p.revisionCount > 0 && p.nextRevisionAt && p.nextRevisionAt.slice(0, 10) <= today && p.revisionCount < 5)
-    .sort((a, b) => (a.nextRevisionAt ?? '').localeCompare(b.nextRevisionAt ?? ''))
-    .slice(0, 6);
+  const revisions = Object.values(db.progress)
+    .filter((progress) => progress.revisionCount > 0 && progress.nextRevisionAt && todayKey(new Date(progress.nextRevisionAt)) <= today && progress.revisionCount < 5)
+    .sort((a, b) => (a.nextRevisionAt ?? '').localeCompare(b.nextRevisionAt ?? ''));
 
-  const hoursThisWeek = stats.days7.map((d, i) => ({
-    label: WEEKDAY_LABELS[new Date(d.day + 'T00:00:00').getDay()],
-    values: [{ name: 'Study hrs', value: Math.round((d.minutes / 60) * 10) / 10 }],
+  const activeLecture = [...db.lectures]
+    .filter((lecture) => lectureProgress(lecture).remaining > 0)
+    .sort((a, b) => (b.lastWatchedAt ?? b.createdAt).localeCompare(a.lastWatchedAt ?? a.createdAt))[0] ?? null;
+  const activeLectureProgress = activeLecture ? lectureProgress(activeLecture) : null;
+  const activeSyllabus = Object.values(db.progress)
+    .filter((progress) => progress.status === 'in_progress')
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+
+  const hoursThisWeek = stats.days7.map((day) => ({
+    label: WEEKDAY_LABELS[new Date(`${day.day}T00:00:00`).getDay()],
+    values: [{ name: 'Study hrs', value: Math.round(day.minutes / 6) / 10 }],
   }));
-
-  const paperRows = papers
-    .filter((p) => p.total > 0)
-    .map((p) => ({ label: p.paper.title.replace('Geography Optional — ', 'Geo Opt '), pct: p.pct }));
+  const paperRows = papers.filter((paper) => paper.total > 0).map((paper) => ({
+    label: paper.paper.title.replace('Geography Optional — ', 'Geo · '), pct: paper.pct,
+  }));
+  const geoPapers = papers.filter((paper) => paper.paper.category === 'optional');
+  const geoDone = geoPapers.reduce((sum, paper) => sum + paper.completed, 0);
+  const geoTotal = geoPapers.reduce((sum, paper) => sum + paper.total, 0);
+  const geoPct = geoTotal ? Math.round(geoDone / geoTotal * 100) : 0;
 
   const upcomingTests = [
-    ...db.prelimsTests.map((t) => ({ name: t.testName, date: t.testDate, kind: 'Prelims' })),
-    ...db.mainsTests.map((t) => ({ name: t.testName, date: t.testDate, kind: 'Mains' })),
-  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+    ...db.prelimsTests.map((test) => ({ name: test.testName, date: test.testDate, kind: 'Prelims' })),
+    ...db.mainsTests.map((test) => ({ name: test.testName, date: test.testDate, kind: 'Mains' })),
+  ].filter((test) => test.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+
+  const examDates = examDatesFor(db.settings.targetExamYear);
+  const prelimsDays = examDates ? daysUntilExam(examDates.prelims, today) : null;
+  const needsAttention = stats.tasks.overdue + stats.revision.overdue;
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head dashboard-head">
         <div>
-          <h1>Dashboard</h1>
-          <div className="sub">UPSC CSE {db.settings.targetExamYear} · {db.settings.optional} Optional · your preparation at a glance</div>
+          <span className="eyebrow">YOUR PREPARATION COMMAND CENTRE</span>
+          <h1>Today, with intention.</h1>
+          <div className="sub">UPSC CSE {db.settings.targetExamYear} · {db.settings.optional} Optional · application day resets at 4:00 AM</div>
         </div>
+        {examDates && (
+          <div className="exam-date-strip">
+            <span><b>{prelimsDays != null && prelimsDays >= 0 ? prelimsDays : '—'}</b> days to Prelims</span>
+            <span>23 May 2027</span>
+            <i />
+            <span>Mains · 20 Aug 2027</span>
+          </div>
+        )}
       </div>
 
-      <div className="grid cols-5" style={{ marginBottom: 14 }}>
-        <Stat onClick={() => navigate('/tasks')} icon="✓" tone="ok" value={`${stats.tasks.done}/${stats.tasks.today}`} label="Today's tasks" extra={stats.tasks.overdue ? `${stats.tasks.overdue} overdue` : 'on track'} />
-        <Stat onClick={() => navigate('/syllabus')} icon="☰" tone="accent" value={`${stats.syllabus.pct}%`} label="Syllabus" extra={`${stats.syllabus.done}/${stats.syllabus.total} subtopics`} />
-        <Stat onClick={() => navigate('/revision')} icon="↻" tone={stats.revision.overdue ? 'bad' : 'geo'} value={`${stats.revision.dueToday + stats.revision.overdue}`} label="Revisions due" extra={stats.revision.overdue ? `${stats.revision.overdue} overdue` : `${stats.revision.revisedItems} items in cycle`} />
-        <Stat onClick={() => navigate('/tests')} icon="A" tone="warn" value={stats.tests.count ? `${stats.tests.avg}%` : '—'} label="Test avg" extra={stats.tests.count ? `${stats.tests.count} tests` : 'no tests yet'} />
-        <Stat onClick={() => navigate('/hours')} icon="🔥" tone="bad" value={`${stats.streak}d`} label="Streak" extra={`${fmtDuration(stats.weekMinutes)} this week`} />
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: '1.05fr 1.4fr', marginBottom: 14 }}>
-        <Card>
-          <CardHead title="Study hours" icon="⏱" hint="last 7 days" right={<span style={{ fontWeight: 800 }}>{fmtDuration(stats.weekMinutes)}</span>} />
-          <div className="card-pad" style={{ paddingTop: 10 }}>
-            {stats.weekMinutes > 0 ? <ColumnsChart data={hoursThisWeek} height={150} /> : <Empty icon="⏱" title="No sessions this week" hint="Log focus time from the Study Timer" action={<button className="btn sm" onClick={() => navigate('/timer')}>Open timer</button>} />}
-            <hr className="divider" />
-            <div className="row small soft" style={{ justifyContent: 'space-between' }}>
-              <span>Today: <b style={{ color: 'var(--text)' }}>{fmtDuration(stats.todayMinutes)}</b> / target {fmtDuration(db.settings.dailyTargetMinutes)}</span>
-              <span>{Math.round((stats.todayMinutes / db.settings.dailyTargetMinutes) * 100)}%</span>
-            </div>
+      <section className="dashboard-primary-grid">
+        <Card className="today-study-card">
+          <div className="action-card-kicker">TODAY'S STUDY</div>
+          <div className="today-study-value">{fmtDuration(stats.todayMinutes)}</div>
+          <div className="soft small">of {fmtDuration(db.settings.dailyTargetMinutes)} daily focus target</div>
+          <Bar value={db.settings.dailyTargetMinutes ? stats.todayMinutes / db.settings.dailyTargetMinutes * 100 : 0} tone="ok" />
+          <div className="today-study-meta">
+            <span><b>{db.focusSessions.filter((session) => session.completed && session.sessionType === 'focus' && todayKey(new Date(session.startedAt)) === today).length}</b> sessions</span>
+            <span><b>{todaysDone.length}</b> tasks done</span>
+            <span><b>{stats.streak}d</b> streak</span>
           </div>
+          <button className="btn primary" onClick={() => navigate('/timer')}>Start a focus session →</button>
         </Card>
 
-        <Card>
-          <CardHead title="Paper progress" icon="☰" hint="leaf-unit completion" right={<span style={{ fontWeight: 800 }}>{stats.syllabus.pct}% overall</span>} />
-          <div className="card-pad" style={{ paddingTop: 14 }}>
-            {paperRows.length ? <HBars rows={paperRows} /> : <Empty title="Syllabus loads automatically" hint="Progress appears as you complete topics" />}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid" style={{ gridTemplateColumns: '1.3fr 1fr 1fr' }}>
-        <Card>
-          <CardHead title="Task trend" icon="◫" hint="last 14 days" right={
-            <span className="legend">
-              <span><span className="dot" style={{ background: 'var(--ok)' }} /> completed</span>
-              <span><span className="dot" style={{ background: 'var(--accent)' }} /> planned</span>
-            </span>} />
-          <div className="card-pad" style={{ paddingTop: 8 }}>
-            <LineChart
-              height={175}
-              series={[
-                { name: 'planned', color: 'var(--accent)', points: trend.map((t) => t.created) },
-                { name: 'completed', color: 'var(--ok)', points: trend.map((t) => t.completed) },
-              ]}
-              xLabels={trend.map((t) => `${t.day.slice(8)}/${t.day.slice(5, 7)}`)}
-            />
-          </div>
+        <Card className="continue-study-card">
+          <div className="action-card-kicker">CONTINUE STUDYING</div>
+          {activeLecture && activeLectureProgress ? (
+            <>
+              <div className="continue-icon">▶</div>
+              <div className="continue-context">GEOGRAPHY OPTIONAL · {activeLecture.subject}</div>
+              <h2>{activeLecture.title}</h2>
+              <p className="soft">Next: Lecture {activeLectureProgress.next} · {activeLectureProgress.remaining} remaining</p>
+              <Bar value={activeLectureProgress.pct} tone="geo" />
+              <button className="btn geo" onClick={() => navigate('/lectures')}>Continue lecture series →</button>
+            </>
+          ) : activeSyllabus ? (
+            <>
+              <div className="continue-icon">☰</div>
+              <div className="continue-context">OPERATIONAL SYLLABUS</div>
+              <h2>{itemTitle(activeSyllabus.itemId, activeSyllabus.itemType)}</h2>
+              <p className="soft">Last updated {new Date(activeSyllabus.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+              <button className="btn" onClick={() => navigate('/syllabus')}>Open syllabus →</button>
+            </>
+          ) : (
+            <Empty icon="◇" title="No active study item" hint="Start a lecture or mark a syllabus item in progress and it will appear here."
+              action={<button className="btn" onClick={() => navigate('/syllabus')}>Open syllabus</button>} />
+          )}
         </Card>
 
-        <Card>
-          <CardHead title="Today & overdue" icon="✓" right={<button className="link-btn" onClick={() => navigate('/tasks')}>Planner →</button>} />
-          <div className="card-pad" style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {todaysTasks.length === 0 && <Empty icon="🌤" title="Nothing pending" hint="Add tasks in the Daily Planner" />}
-            {todaysTasks.map((t) => (
-              <div key={t.id} className="row" style={{ gap: 9 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: t.deadline < today ? 'var(--bad)' : t.priority === 'critical' ? 'var(--warn)' : 'var(--accent)' }} />
-                <span className="small grow" style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
-                <span className="tiny muted" style={{ flexShrink: 0 }}>{relDay(t.deadline)}</span>
-              </div>
+        <Card className="todays-plan-card">
+          <CardHead title="Today's Plan" hint={`${todaysTasks.length} pending · ${todaysDone.length} complete`} right={<button className="link-btn" onClick={() => navigate('/tasks')}>Planner →</button>} />
+          <div className="dashboard-list">
+            {todaysTasks.length === 0 && <Empty icon="✓" title="Plan is clear" hint="Add the next meaningful task." />}
+            {todaysTasks.slice(0, 5).map((task) => (
+              <button key={task.id} className="dashboard-task-row" onClick={() => navigate('/tasks')}>
+                <span className={`priority-dot ${task.deadline < today ? 'overdue' : task.priority}`} />
+                <span><b>{task.name}</b><small>{task.startTime || relDay(task.deadline)}{task.subjectMapping ? ` · ${task.subjectMapping}` : ''}</small></span>
+                {task.estimateMin && <em>{task.estimateMin}m</em>}
+              </button>
             ))}
           </div>
         </Card>
+      </section>
 
-        <Card>
-          <CardHead title="Revision due" icon="↻" right={<button className="link-btn" onClick={() => navigate('/revision')}>Revise →</button>} />
-          <div className="card-pad" style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {revisionDue.length === 0 && <Empty icon="✨" title="Queue clear" hint="Mark topics completed to feed the R1–R5 cycle" />}
-            {revisionDue.map((p) => {
-              const title = syllabus.subtopicById.get(p.itemId)?.title ?? syllabus.topicById.get(p.itemId)?.title ?? itemTitle(p.itemId, 'subtopic');
-              return (
-                <div key={p.itemId} className="row" style={{ gap: 9 }}>
-                  <RChip count={p.revisionCount} />
-                  <span className="small grow" style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title}>{title}</span>
-                  <span className="tiny muted" style={{ flexShrink: 0 }}>{p.nextRevisionAt!.slice(0, 10) < today ? 'overdue' : relDay(p.nextRevisionAt!.slice(0, 10))}</span>
-                </div>
-              );
-            })}
+      <section className="dashboard-support-grid">
+        <Card className="geo-priority-card">
+          <div className="geo-card-heading">
+            <div><span className="action-card-kicker">FIRST-CLASS PRIORITY</span><h2>Geography Optional</h2></div>
+            <div className="geo-overall"><b>{geoPct}%</b><span>syllabus</span></div>
           </div>
+          <div className="geo-card-content">
+            <div>
+              <span className="tiny muted">CURRENT LECTURE POSITION</span>
+              {activeLecture && activeLectureProgress ? (
+                <><strong>{activeLecture.title}</strong><p>Lecture {activeLectureProgress.next ?? activeLecture.rangeEnd} · {activeLectureProgress.count}/{activeLectureProgress.total} complete</p></>
+              ) : <><strong>No active series</strong><p>Add an inclusive lecture range to begin.</p></>}
+            </div>
+            <div>
+              <span className="tiny muted">LECTURE COVERAGE</span>
+              <strong>{lectures.completed}/{lectures.total}</strong>
+              <p>{lectures.pct}% complete · {lectures.total - lectures.completed} remaining</p>
+            </div>
+          </div>
+          <div className="row wrap"><button className="btn geo" onClick={() => navigate('/lectures')}>Open lectures</button><button className="btn ghost" onClick={() => navigate('/syllabus')}>Geo syllabus →</button></div>
         </Card>
-      </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 14 }}>
-        <Card>
-          <CardHead title="Confidence split" icon="◐" hint="revised items by confidence" />
-          <div className="card-pad" style={{ paddingTop: 14 }}>
-            {conf.low + conf.medium + conf.high === 0
-              ? <Empty icon="◐" title="No revisions yet" hint="Run your first R1 from the Revision page" />
-              : <Donut
-                  segments={[
-                    { label: 'High', value: conf.high, color: 'var(--ok)' },
-                    { label: 'Medium', value: conf.medium, color: 'var(--warn)' },
-                    { label: 'Low', value: conf.low, color: 'var(--bad)' },
-                  ]}
-                  centerLabel={`${conf.high + conf.medium + conf.low}`}
-                  centerSub="items"
-                />}
+        <Card className="attention-card">
+          <CardHead title="Needs Attention" hint={needsAttention ? `${needsAttention} items` : 'all clear'} />
+          <div className="attention-items">
+            <button onClick={() => navigate('/tasks')}><span className="attention-icon bad">!</span><span><b>{stats.tasks.overdue} overdue tasks</b><small>{stats.tasks.upcomingWeek} due in the next week</small></span></button>
+            <button onClick={() => navigate('/revision')}><span className="attention-icon warn">↻</span><span><b>{stats.revision.overdue} overdue revisions</b><small>{stats.revision.dueToday} due today</small></span></button>
+            <button onClick={() => navigate('/syllabus')}><span className="attention-icon geo">☰</span><span><b>{stats.syllabus.total - stats.syllabus.done} syllabus units remain</b><small>{stats.syllabus.pct}% overall coverage</small></span></button>
+          </div>
+        </Card>
+
+        <Card className="quick-actions-card">
+          <CardHead title="Quick Actions" hint="move the work forward" />
+          <div className="quick-action-grid">
+            <button onClick={() => navigate('/tasks')}><span>＋</span>Add task</button>
+            <button onClick={() => navigate('/timer')}><span>◷</span>Focus</button>
+            <button onClick={() => navigate('/revision')}><span>↻</span>Revise</button>
+            <button onClick={() => navigate('/lectures')}><span>▶</span>Lecture</button>
+          </div>
+        </Card>
+      </section>
+
+      <div className="dashboard-section-title"><div><span>ANALYTICS</span><h2>Progress at a glance</h2></div><p>Useful signals, below today's work.</p></div>
+
+      <section className="dashboard-analytics-grid">
+        <Card className="study-hours-chart">
+          <CardHead title="Study Hours" icon="◷" hint="last 7 application days" right={<b>{fmtDuration(stats.weekMinutes)}</b>} />
+          <div className="card-pad dashboard-chart-pad">
+            {stats.weekMinutes > 0 ? <ColumnsChart data={hoursThisWeek} height={170} /> : <Empty icon="◷" title="No sessions this week" hint="Focus sessions appear here automatically." />}
           </div>
         </Card>
         <Card>
-          <CardHead title="Recent tests" icon="A" right={<button className="link-btn" onClick={() => navigate('/tests')}>All tests →</button>} />
-          <div className="card-pad" style={{ paddingTop: 8 }}>
-            {upcomingTests.length === 0 ? <Empty icon="A" title="No tests logged" hint="Track mocks in the Test Tracker" /> : (
-              <div className="table-wrap">
-                <table className="tbl">
-                  <thead><tr><th>Test</th><th>Type</th><th>Date</th></tr></thead>
-                  <tbody>
-                    {upcomingTests.map((t, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
-                        <td><span className={`chip ${t.kind === 'Prelims' ? 'info' : 'accent'}`}>{t.kind}</span></td>
-                        <td className="num muted">{t.date}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <CardHead title="Paper Progress" icon="☰" hint="leaf-unit completion" right={<b>{stats.syllabus.pct}%</b>} />
+          <div className="card-pad dashboard-chart-pad">{paperRows.length ? <HBars rows={paperRows} /> : <Empty title="No progress yet" hint="Complete syllabus units to build this view." />}</div>
+        </Card>
+        <Card>
+          <CardHead title="Confidence Split" icon="◐" hint="revised items" />
+          <div className="card-pad dashboard-chart-pad">
+            {confidence.low + confidence.medium + confidence.high === 0 ? <Empty icon="◐" title="No revisions yet" hint="Log R1 to begin." /> : <Donut segments={[
+              { label: 'High', value: confidence.high, color: 'var(--ok)' },
+              { label: 'Medium', value: confidence.medium, color: 'var(--warn)' },
+              { label: 'Low', value: confidence.low, color: 'var(--bad)' },
+            ]} centerLabel={`${confidence.low + confidence.medium + confidence.high}`} centerSub="items" />}
           </div>
         </Card>
-      </div>
+        <Card className="task-trend-card">
+          <CardHead title="Task Trend" icon="◫" hint="last 14 application days" right={<span className="legend"><span><i className="dot ok-dot" /> completed</span><span><i className="dot accent-dot" /> planned</span></span>} />
+          <div className="card-pad dashboard-chart-pad"><LineChart height={170} series={[
+            { name: 'planned', color: 'var(--accent)', points: trend.map((point) => point.created) },
+            { name: 'completed', color: 'var(--ok)', points: trend.map((point) => point.completed) },
+          ]} xLabels={trend.map((point) => point.day.slice(8))} /></div>
+        </Card>
+        <Card className="upcoming-tests-card">
+          <CardHead title="Upcoming Tests" icon="A" right={<button className="link-btn" onClick={() => navigate('/tests')}>Tests →</button>} />
+          <div className="dashboard-list tests-list">
+            {upcomingTests.length === 0 && <Empty icon="A" title="No upcoming tests" hint="Future-dated tests will appear here." />}
+            {upcomingTests.map((test) => <div key={`${test.kind}-${test.date}-${test.name}`}><span className={`chip ${test.kind === 'Prelims' ? 'info' : 'accent'}`}>{test.kind}</span><b>{test.name}</b><time>{relDay(test.date)}</time></div>)}
+          </div>
+        </Card>
+        <Card className="revision-preview-card">
+          <CardHead title="Revision Queue" icon="↻" right={<button className="link-btn" onClick={() => navigate('/revision')}>Review →</button>} />
+          <div className="dashboard-list revision-list">
+            {revisions.length === 0 && <Empty icon="◇" title="Queue clear" hint="No revision is due today." />}
+            {revisions.slice(0, 5).map((progress) => (
+              <div key={progress.itemId}><RChip count={progress.revisionCount} /><b>{itemTitle(progress.itemId, progress.itemType)}</b><time>{todayKey(new Date(progress.nextRevisionAt!)) < today ? 'overdue' : 'today'}</time></div>
+            ))}
+          </div>
+        </Card>
+      </section>
     </>
-  );
-}
-
-function Stat({ icon, value, label, extra, tone = 'accent', onClick }: { icon: string; value: string; label: string; extra?: string; tone?: 'accent' | 'ok' | 'warn' | 'bad' | 'geo'; onClick?: () => void }) {
-  const toneVar = { accent: 'var(--accent)', ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--bad)', geo: 'var(--geo)' }[tone];
-  const toneSoft = { accent: 'var(--accent-soft)', ok: 'var(--ok-soft)', warn: 'var(--warn-soft)', bad: 'var(--bad-soft)', geo: 'var(--geo-soft)' }[tone];
-  return (
-    <Card className="stat-card" >
-      <div onClick={onClick}>
-        <div className="stat-top">
-          <span className="stat-ico" style={{ background: toneSoft, color: toneVar }}>{icon}</span>
-        </div>
-        <div className="stat-value">{value}</div>
-        <div className="stat-label">{label}</div>
-        {extra && <div className="stat-extra">{extra}</div>}
-      </div>
-    </Card>
   );
 }

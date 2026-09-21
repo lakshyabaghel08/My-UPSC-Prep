@@ -207,8 +207,9 @@ export function habitCompFromDb(r: Row, id: string): HabitCompletion {
 export function lectureToDb(userId: string, l: Lecture): Row {
   return {
     user_id: userId, title: l.title, subject: l.subject, chapter: l.chapter ?? '',
-    lecture_no: l.lectureNo, total_lectures: l.totalLectures, source: l.source ?? '',
-    pdf_followed: l.pdfFollowed ?? '', short_notes_made: l.shortNotesMade,
+    lecture_no: l.lectureNo, total_lectures: l.totalLectures,
+    range_start: l.rangeStart, range_end: l.rangeEnd, completed_lectures: l.completedLectures ?? [],
+    source: l.source ?? '', pdf_followed: l.pdfFollowed ?? '', short_notes_made: l.shortNotesMade,
     notes_link: l.notesLink ?? '', revised: l.revised, revision_count: l.revisionCount,
     pyqs_attempted: l.pyqsAttempted, status: l.status,
     last_watched_at: l.lastWatchedAt, completed_at: l.completedAt,
@@ -219,6 +220,9 @@ export function lectureFromDb(r: Row, id: string): Lecture {
   return {
     id, title: str(r.title), subject: str(r.subject), chapter: str(r.chapter),
     lectureNo: (r.lecture_no as number) ?? 1, totalLectures: (r.total_lectures as number) ?? 1,
+    rangeStart: (r.range_start as number) ?? 1,
+    rangeEnd: (r.range_end as number) ?? ((r.total_lectures as number) ?? 1),
+    completedLectures: Array.isArray(r.completed_lectures) ? (r.completed_lectures as number[]).map(Number) : [],
     source: str(r.source), pdfFollowed: str(r.pdf_followed),
     shortNotesMade: Boolean(r.short_notes_made), notesLink: str(r.notes_link),
     revised: Boolean(r.revised), revisionCount: (r.revision_count as number) ?? 0,
@@ -380,22 +384,9 @@ export class Repository {
     const { error } = await this.sb.from(table).delete().eq('id', id);
     if (error) throw new Error(`${table}: ${error.message}`);
   }
-  async upsertHabitCompletion(c: HabitCompletion) {
-    const { error } = await this.sb.from('habit_completions').upsert(habitCompToDb(this.userId, c), { onConflict: 'habit_id,date' });
-    if (error) throw new Error(`habit_completions: ${error.message}`);
-  }
-  async deleteHabitCompletion(c: HabitCompletion) {
-    const { error } = await this.sb.from('habit_completions')
-      .delete().eq('habit_id', c.habitId).eq('date', c.date);
-    if (error) throw new Error(`habit_completions: ${error.message}`);
-  }
   async updateLecture(id: string, l: Lecture) {
     const { error } = await this.sb.from('lectures').update(lectureToDb(this.userId, l)).eq('id', id);
     if (error) throw new Error(`lectures: ${error.message}`);
-  }
-  async updatePYQ(id: string, p: PYQ) {
-    const { error } = await this.sb.from('pyqs').update(pyqToDb(this.userId, p)).eq('id', id);
-    if (error) throw new Error(`pyqs: ${error.message}`);
   }
   async updateCurrentAffair(id: string, c: CurrentAffairItem) {
     const { error } = await this.sb.from('current_affairs').update(caToDb(this.userId, c)).eq('id', id);
@@ -425,6 +416,7 @@ export class Repository {
     pyqIdMap: Record<string, string>;
     prelimsTestIdMap: Record<string, string>;
     mainsTestIdMap: Record<string, string>;
+    focusSessionIdMap: Record<string, string>;
     lectureIdMap: Record<string, string>;
     currentAffairIdMap: Record<string, string>;
     answerIdMap: Record<string, string>;
@@ -470,7 +462,7 @@ export class Repository {
     const prelimsTestIdMap = zip(db.prelimsTests.map((t) => t.id), await this.insertPrelimsTestsAndGetIds(db.prelimsTests));
     const mainsTestIdMap = zip(db.mainsTests.map((t) => t.id), await this.insertMainsTestsAndGetIds(db.mainsTests));
     step('Uploading focus sessions…', 78);
-    await this.insertFocusSessionsAndGetIds(db.focusSessions);
+    const focusSessionIdMap = zip(db.focusSessions.map((s) => s.id), await this.insertFocusSessionsAndGetIds(db.focusSessions));
     step('Uploading Geography lectures…', 84);
     const lectureIdMap = zip(db.lectures.map((l) => l.id), await this.insertLecturesAndGetIds(db.lectures));
     step('Uploading current affairs…', 90);
@@ -479,6 +471,6 @@ export class Repository {
     const answerIdMap = zip(db.answers.map((a) => a.id), await this.insertAnswersAndGetIds(db.answers));
 
     step('Migration complete ✓', 100);
-    return { habitIdMap, taskIdMap, pyqIdMap, prelimsTestIdMap, mainsTestIdMap, lectureIdMap, currentAffairIdMap, answerIdMap };
+    return { habitIdMap, taskIdMap, pyqIdMap, prelimsTestIdMap, mainsTestIdMap, focusSessionIdMap, lectureIdMap, currentAffairIdMap, answerIdMap };
   }
 }

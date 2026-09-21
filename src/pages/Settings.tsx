@@ -22,7 +22,6 @@ export function Settings() {
     progress: Object.keys(db.progress).length,
     logs: db.revisionLogs.length,
     tests: db.prelimsTests.length + db.mainsTests.length,
-    pyqs: db.pyqs.length,
     lectures: db.lectures.length,
     ca: db.currentAffairs.length,
     answers: db.answers.length,
@@ -149,9 +148,9 @@ export function Settings() {
               <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
             </div>
             <div className="card card-pad small soft" style={{ background: 'var(--surface-2)', border: 'none' }}>
-              <b style={{ color: 'var(--text)' }}>What's inside a backup:</b> syllabus progress & notes, tasks, revision logs, PYQs, tests, focus sessions, habits, lecture tracker, current affairs, answer log, settings.
+              <b style={{ color: 'var(--text)' }}>What's inside a backup:</b> syllabus progress & notes, tasks, revision logs, tests, focus sessions, lecture tracker, current affairs, answer log and settings. Legacy records remain in the file for data safety.
               <div className="tiny muted" style={{ marginTop: 6 }}>
-                {stats.progress} progress records · {stats.tasks} tasks · {stats.logs} revision logs · {stats.tests} tests · {stats.pyqs} PYQs · {stats.lectures} lecture series · {stats.ca} CA items · {stats.answers} answers · {stats.sessions} sessions
+                {stats.progress} progress records · {stats.tasks} tasks · {stats.logs} revision logs · {stats.tests} tests · {stats.lectures} lecture series · {stats.ca} CA items · {stats.answers} answers · {stats.sessions} sessions
               </div>
             </div>
             <p className="tiny muted">Tip: take a backup every Sunday. Restore replaces everything on this device with the file's contents.</p>

@@ -1,11 +1,36 @@
-/** Date helpers — all local dates are 'yyyy-MM-dd' strings unless noted. */
+/**
+ * Date helpers — all day keys are local `yyyy-MM-dd` strings.
+ *
+ * My UPSC Prep uses a 4:00 AM application-day boundary. `todayKey` (and its
+ * explicit alias `applicationDayKey`) is the single source of truth for that
+ * rule: 00:00–03:59 belongs to the previous application day. Calendar-key
+ * arithmetic deliberately does not apply the shift a second time.
+ */
 export const MS_DAY = 86400000;
+export const APPLICATION_DAY_START_HOUR = 4;
 
-export function todayKey(d: Date = new Date()): string {
+function localCalendarKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Return the application day containing this instant (4:00 AM → 3:59 AM). */
+export function applicationDayKey(d: Date = new Date()): string {
+  const shifted = new Date(d);
+  shifted.setHours(shifted.getHours() - APPLICATION_DAY_START_HOUR);
+  return localCalendarKey(shifted);
+}
+
+/** Backwards-compatible name used throughout the app; now follows 4:00 AM. */
+export const todayKey = applicationDayKey;
+
+/** The local instant at which an application day starts. */
+export function applicationDayStart(key: string = todayKey()): Date {
+  const d = dateFromKey(key);
+  d.setHours(APPLICATION_DAY_START_HOUR, 0, 0, 0);
+  return d;
 }
 
 export function dateFromKey(key: string): Date {
@@ -16,18 +41,19 @@ export function dateFromKey(key: string): Date {
 export function addDays(key: string | Date, days: number): string {
   const d = typeof key === 'string' ? dateFromKey(key) : new Date(key);
   d.setDate(d.getDate() + days);
-  return todayKey(d);
+  // `d` represents a calendar day here, not an instant to classify.
+  return localCalendarKey(d);
 }
 
 export function startOfWeek(key: string): string {
   const d = dateFromKey(key);
   d.setDate(d.getDate() - d.getDay()); // week starts Sunday
-  return todayKey(d);
+  return localCalendarKey(d);
 }
 
 export function startOfMonth(key: string): string {
   const d = dateFromKey(key);
-  return todayKey(new Date(d.getFullYear(), d.getMonth(), 1));
+  return localCalendarKey(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 export function daysBetween(fromKey: string, toKey: string): number {
@@ -99,14 +125,12 @@ export function nowTimeKey(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Streak of consecutive days with >=1 logged activity (sessions or completed tasks). */
-export function computeStreak(activeDays: Set<string>, today: string): number {
+/** Streak of consecutive application days with >=1 logged activity. */
+export function computeStreak(activeDays: Set<string>, today: string = todayKey()): number {
   let streak = 0;
   let cursor = today;
-  // allow today to be inactive without breaking yesterday's streak
-  if (!activeDays.has(cursor)) {
-    cursor = addDays(cursor, -1);
-  }
+  // allow the current application day to be inactive without breaking yesterday's streak
+  if (!activeDays.has(cursor)) cursor = addDays(cursor, -1);
   while (activeDays.has(cursor)) {
     streak++;
     cursor = addDays(cursor, -1);

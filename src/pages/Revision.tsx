@@ -7,7 +7,7 @@ import { revisionQueue, confidenceSplit } from '../store/selectors';
 import { syllabus, itemTitle } from '../data/syllabus';
 import { ReviseModal } from './Syllabus';
 import { rLabel } from '../lib/revision';
-import { todayKey, relDay, formatDate } from '../lib/date';
+import { addDays, todayKey, relDay, formatDate } from '../lib/date';
 import type { ItemProgress } from '../types';
 
 export function Revision() {
@@ -28,7 +28,7 @@ export function Revision() {
   const today = todayKey();
 
   const pendingCount = q.overdue.length + q.dueToday.length;
-  const completedToday = db.revisionLogs.filter((l) => l.revisedAt.slice(0, 10) === today).length;
+  const completedToday = db.revisionLogs.filter((l) => todayKey(new Date(l.revisedAt)) === today).length;
 
   return (
     <>
@@ -56,7 +56,7 @@ export function Revision() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <QueueList title="⏰ Overdue — revise first" tone="bad" items={q.overdue} onRevise={setRevItem} titleFor={titleFor} emptyText="Nothing overdue. Excellent discipline." />
             <QueueList title="◉ Due today" tone="warn" items={q.dueToday} onRevise={setRevItem} titleFor={titleFor} emptyText="Nothing due today." />
-            <QueueList title="→ Upcoming (next 14 days)" tone="geo" items={q.upcoming.filter((p) => p.nextRevisionAt && p.nextRevisionAt <= new Date(Date.now() + 14 * 86400000).toISOString())} onRevise={setRevItem} titleFor={titleFor} emptyText="Queue is clear beyond today." />
+            <QueueList title="→ Upcoming (next 14 days)" tone="geo" items={q.upcoming.filter((p) => p.nextRevisionAt && todayKey(new Date(p.nextRevisionAt)) <= addDays(today, 14))} onRevise={setRevItem} titleFor={titleFor} emptyText="Queue is clear beyond today." />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Card>
@@ -194,8 +194,8 @@ function QueueList({ title, tone, items, onRevise, titleFor, emptyText }: {
                 <div className="small" style={{ fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
                 <div className="tiny muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.path}</div>
               </div>
-              <span className={`chip ${p.nextRevisionAt && p.nextRevisionAt.slice(0, 10) < todayKey() ? 'bad' : 'geo'}`}>
-                {p.nextRevisionAt ? relDay(p.nextRevisionAt.slice(0, 10)) : '—'}
+              <span className={`chip ${p.nextRevisionAt && todayKey(new Date(p.nextRevisionAt)) < todayKey() ? 'bad' : 'geo'}`}>
+                {p.nextRevisionAt ? relDay(todayKey(new Date(p.nextRevisionAt))) : '—'}
               </span>
               <button className="btn sm geo" onClick={() => onRevise({ id: p.itemId, type: t.type, title: t.title })}>Revise</button>
             </div>

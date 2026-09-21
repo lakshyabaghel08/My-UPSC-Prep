@@ -4,20 +4,12 @@ import { syllabus } from '../data/syllabus';
 import { pct, clamp } from '../lib/id';
 import { todayKey, addDays, startOfWeek, computeStreak, dateFromKey } from '../lib/date';
 import { revisionBucket } from '../lib/revision';
+import { hierarchyStatus, leafNodes, parentNode } from '../lib/syllabusProgress';
+import { lectureProgress } from '../lib/lectures';
 
-/** Effective status: rolls child completion up the hierarchy. */
+/** Effective status: deterministic child-to-parent rollup. */
 export function statusOf(itemId: string, db: MupDatabase): ItemStatus {
-  const p = db.progress[itemId];
-  if (p?.status === 'completed') return 'completed';
-  // roll up: completed when all children completed
-  let children: string[] = [];
-  if (syllabus.paperById.has(itemId)) children = (syllabus.subjectsOf.get(itemId) ?? []).map((s) => s.id);
-  else if (syllabus.subjectById.has(itemId)) children = (syllabus.chaptersOf.get(itemId) ?? []).map((c) => c.id);
-  else if (syllabus.chapterById.has(itemId)) children = (syllabus.topicsOf.get(itemId) ?? []).map((t) => t.id);
-  else if (syllabus.topicById.has(itemId)) children = (syllabus.subtopicsOf.get(itemId) ?? []).map((s) => s.id);
-  else return p?.status ?? 'not_started';
-  if (children.length === 0) return p?.status ?? 'not_started';
-  return children.every((c) => statusOf(c, db) === 'completed') ? 'completed' : (p?.status === 'in_progress' ? 'in_progress' : 'not_started');
+  return hierarchyStatus(itemId, db.progress);
 }
 
 export function progressOf(itemId: string, db: MupDatabase): ItemProgress | undefined {
@@ -41,27 +33,12 @@ export function treeStats(db: MupDatabase): Map<string, NodeStat> {
     if (status === 'completed') e.completed++;
     else if (status === 'in_progress') e.inProgress++;
   };
-  const addChain = (st: { id: string; topicId: string }, status: ItemStatus) => {
-    add(st.id, status);
-    const topic = syllabus.topicById.get(st.topicId);
-    if (!topic) return;
-    add(topic.id, status);
-    const chapter = syllabus.chapterById.get(topic.chapterId);
-    if (!chapter) return;
-    add(chapter.id, status);
-    const subject = syllabus.subjectById.get(chapter.subjectId);
-    if (!subject) return;
-    add(subject.id, status);
-    add(subject.paperId, status);
-  };
-
-  for (const st of syllabus.subtopics) {
-    addChain(st, db.progress[st.id]?.status ?? 'not_started');
-  }
-  // topics without subtopics act as leaves
-  for (const t of syllabus.topics) {
-    if ((syllabus.subtopicsOf.get(t.id) ?? []).length === 0) {
-      addChain({ id: t.id, topicId: t.id }, db.progress[t.id]?.status ?? 'not_started');
+  for (const leaf of leafNodes()) {
+    const status = db.progress[leaf.id]?.status ?? 'not_started';
+    let node: { id: string } | null = leaf;
+    while (node) {
+      add(node.id, status);
+      node = parentNode(node.id);
     }
   }
   for (const [id, e] of m) e.pct = pct(e.completed, e.total);
@@ -78,6 +55,16 @@ export function leafStats(itemType: 'paper' | 'subject' | 'chapter' | 'topic', i
   return ts.get(itemId) ?? { total: 0, completed: 0, inProgress: 0, pct: 0 };
 }
 
+export function focusMinutesByApplicationDay(db: MupDatabase): Map<string, number> {
+  const minutes = new Map<string, number>();
+  for (const session of db.focusSessions) {
+    if (session.sessionType !== 'focus' || !session.completed) continue;
+    const key = todayKey(new Date(session.startedAt));
+    minutes.set(key, (minutes.get(key) ?? 0) + session.durationMinutes);
+  }
+  return minutes;
+}
+
 export function dashboardStats(db: MupDatabase) {
   const today = todayKey();
   // tasks
@@ -86,7 +73,7 @@ export function dashboardStats(db: MupDatabase) {
   const overdue = db.tasks.filter((t) => t.status !== 'completed' && t.deadline < today).length;
   const upcomingWeek = db.tasks.filter((t) => t.status !== 'completed' && t.deadline > today && t.deadline <= addDays(today, 7)).length;
   // syllabus
-  const allLeafIds = syllabus.subtopics.map((s) => s.id);
+  const allLeafIds = leafNodes().map((node) => node.id);
   let done = 0;
   for (const id of allLeafIds) if (db.progress[id]?.status === 'completed') done++;
   const syllabusPct = pct(done, allLeafIds.length);
@@ -109,16 +96,15 @@ export function dashboardStats(db: MupDatabase) {
   for (const t of db.tasks) if (t.completedAt) activeDays.add(todayKey(new Date(t.completedAt)));
   const streak = computeStreak(activeDays, today);
   // focus this week
+  const minutesByDay = focusMinutesByApplicationDay(db);
   const weekStart = startOfWeek(today);
-  const weekSessions = db.focusSessions.filter((s) => s.sessionType === 'focus' && todayKey(new Date(s.startedAt)) >= weekStart);
-  const weekMinutes = weekSessions.reduce((a, s) => a + s.durationMinutes, 0);
-  const todayMinutes = db.focusSessions.filter((s) => s.sessionType === 'focus' && s.completed && todayKey(new Date(s.startedAt)) === today).reduce((a, s) => a + s.durationMinutes, 0);
+  const weekMinutes = [...minutesByDay.entries()].filter(([day]) => day >= weekStart && day <= today).reduce((sum, [, minutes]) => sum + minutes, 0);
+  const todayMinutes = minutesByDay.get(today) ?? 0;
   // 7-day hours for sparkline
   const days7: { day: string; minutes: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const key = addDays(today, -i);
-    const minutes = db.focusSessions.filter((s) => s.sessionType === 'focus' && s.completed && todayKey(new Date(s.startedAt)) === key).reduce((a, s) => a + s.durationMinutes, 0);
-    days7.push({ day: key, minutes });
+    days7.push({ day: key, minutes: minutesByDay.get(key) ?? 0 });
   }
   const geoLectures = lectureSummary(db);
   return {
@@ -158,12 +144,13 @@ export function subjectProgressForPaper(paperId: string, db: MupDatabase) {
 /** Revision queue grouped by bucket. */
 export function revisionQueue(db: MupDatabase) {
   const buckets = { overdue: [] as ItemProgress[], dueToday: [] as ItemProgress[], upcoming: [] as ItemProgress[], notStarted: 0 };
+  const leaves = new Set(leafNodes().map((node) => node.id));
   for (const p of Object.values(db.progress)) {
     const b = revisionBucket(p.nextRevisionAt, p.revisionCount, new Date());
     if (b === 'overdue') buckets.overdue.push(p);
     else if (b === 'due_today') buckets.dueToday.push(p);
     else if (b === 'upcoming') buckets.upcoming.push(p);
-    else buckets.notStarted++;
+    else if (p.status === 'completed' && leaves.has(p.itemId)) buckets.notStarted++;
   }
   buckets.overdue.sort((a, b) => (a.nextRevisionAt ?? '').localeCompare(b.nextRevisionAt ?? ''));
   buckets.dueToday.sort((a, b) => (a.nextRevisionAt ?? '').localeCompare(b.nextRevisionAt ?? ''));
@@ -184,9 +171,10 @@ export function confidenceSplit(db: MupDatabase): { low: number; medium: number;
 
 // ---------- Geography lectures ----------
 export function lectureSummary(db: MupDatabase) {
-  const total = db.lectures.reduce((a, l) => a + l.totalLectures, 0);
-  const completed = db.lectures.filter((l) => l.status === 'completed').reduce((a, l) => a + l.totalLectures, 0) + db.lectures.filter((l) => l.status === 'in_progress').reduce((a, l) => a + Math.max(0, l.lectureNo - 1), 0);
-  const lecturesDone = db.lectures.filter((l) => l.status === 'completed').length;
+  const totals = db.lectures.map(lectureProgress);
+  const total = totals.reduce((sum, item) => sum + item.total, 0);
+  const completed = totals.reduce((sum, item) => sum + item.count, 0);
+  const lecturesDone = totals.filter((item) => item.total > 0 && item.count === item.total).length;
   const notes = db.lectures.filter((l) => l.shortNotesMade).length;
   const revised = db.lectures.filter((l) => l.revised).length;
   const pyqs = db.lectures.reduce((a, l) => a + l.pyqsAttempted, 0);
