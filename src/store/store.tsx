@@ -15,9 +15,10 @@ import type {
   PrelimsTest, MainsTest, FocusSession, Lecture,
   CurrentAffairItem, AnswerEntry, RevisionLog, Settings,
 } from '../types';
-import { loadDb, saveDb, newDatabase } from './db';
+import { loadDb, saveDb, newDatabase, DB_VERSION, DB_KEY, CACHE_KEY_PREFIXES } from './db';
 import { uid } from '../lib/id';
-import { todayKey } from '../lib/date';
+import { addDays, applicationDayKey, dateFromKey, todayKey } from '../lib/date';
+import { composeManualStartedAt, type ManualStudyInput } from '../lib/studyLog';
 import { MAX_REVISION, nextRevisionDate, revisionBucket } from '../lib/revision';
 import { getSupabase, getSessionOnlySupabase, isCloudConfigured } from '../lib/supabase';
 import { Repository } from '../data/repository';
@@ -71,6 +72,13 @@ export interface StoreValue {
   deleteMainsTest: (id: string) => void;
   // focus
   addFocusSession: (s: Omit<FocusSession, 'id'>) => void;
+  /** Record a study block the user forgot to time. Feeds the same
+   *  focus-session pipeline as the timer; never creates a timer session. */
+  logManualStudy: (input: ManualStudyInput, idempotencyKey?: string) => { ok: boolean; error?: string };
+  /** Remove abandoned (non-completed) session records from earlier
+   *  application days — local cache and cloud. Completed sessions are kept
+   *  because Study Hours / Analytics are derived from them. */
+  pruneStaleSessions: () => void;
   // lectures
   addLecture: (l: Partial<Lecture> & { title: string; subject: string }) => void;
   updateLecture: (id: string, patch: Partial<Lecture>) => void;
@@ -87,6 +95,10 @@ export interface StoreValue {
   updateSettings: (patch: Partial<Settings>) => void;
   replaceDb: (next: MupDatabase) => void;
   resetProgressOnly: () => void;
+  /** Delete every user-generated preparation record locally AND in the cloud.
+   * Keeps the auth account, the Remember-Me session and app preferences.
+   * Invalidates in-flight sync so a stale response cannot repopulate data. */
+  wipeAllData: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -94,6 +106,14 @@ const StoreContext = createContext<StoreValue | null>(null);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (id: string) => UUID_RE.test(id);
 const migratedFlagKey = (userId: string) => `mup.migrated.${userId}`;
+const wipeMarkerKey = (userId: string) => `mup.wiped.${userId}`;
+const SESSION_PRUNE_KEY = 'mup.sessions.pruned-day';
+/** Deletion order that respects the schema's foreign keys (children first). */
+const USER_DATA_TABLES = [
+  'habit_completions', 'habits', 'revision_logs', 'syllabus_progress',
+  'focus_sessions', 'answers', 'current_affairs', 'lectures', 'pyqs',
+  'mains_tests', 'prelims_tests', 'tasks',
+] as const;
 
 function emptyProgress(itemId: string, itemType: ItemType, now: string): ItemProgress {
   return {
@@ -147,6 +167,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const progressDirty = useRef<Set<string>>(new Set());
   const progressTimer = useRef<number | undefined>(undefined);
   const settingsTimer = useRef<number | undefined>(undefined);
+  /** Bumped by destructive local resets (wipe). Any pull/push that started
+   *  under an older epoch is discarded when it resolves, so a slow response
+   *  can never write wiped records back into local state. */
+  const syncEpoch = useRef(0);
+  const manualLogKeys = useRef<Set<string>>(new Set());
 
   const repo = useCallback((): Repository | null => {
     if (authState !== 'signed-in' || !isCloudConfigured || !userIdRef.current) return null;
@@ -512,6 +537,106 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authState, push]);
 
+  /** Study the user forgot to time. Same focus-session pipeline as the timer. */
+  const logManualStudy = useCallback((input: ManualStudyInput, idempotencyKey?: string): { ok: boolean; error?: string } => {
+    const minutes = Math.round(Number(input.durationMinutes) * 10) / 10;
+    if (!Number.isFinite(minutes) || minutes <= 0) return { ok: false, error: 'Enter a duration of at least 1 minute.' };
+    if (minutes > 24 * 60) return { ok: false, error: 'A single log cannot exceed 24 hours.' };
+    const key = idempotencyKey ?? `${input.date}|${input.time ?? ''}|${minutes}|${input.taskName.trim()}`;
+    if (manualLogKeys.current.has(key)) return { ok: false, error: 'That log was already saved.' };
+    manualLogKeys.current.add(key);
+    const session: FocusSession = {
+      id: uid('fs'),
+      startedAt: composeManualStartedAt(input.date, input.time),
+      durationMinutes: minutes,
+      taskName: input.taskName.trim() || 'Manual study log',
+      sessionType: 'focus',
+      completed: true,
+    };
+    setDb((d) => ({ ...d, focusSessions: [...d.focusSessions, session] }));
+    void push(`fs:${session.id}`, async (r) => {
+      const ids = await r.insertFocusSessionsAndGetIds([session]);
+      if (ids[0]) applyIdMap('focusSessions', { [session.id]: ids[0] });
+    });
+    return { ok: true };
+  }, [push, applyIdMap]);
+
+  /** Drop abandoned session records from earlier application days.
+   * Completed sessions stay — Study Hours and Analytics read them directly. */
+  const pruneStaleSessions = useCallback(() => {
+    const day = applicationDayKey();
+    let lastRun = '';
+    try { lastRun = localStorage.getItem(SESSION_PRUNE_KEY) ?? ''; } catch { /* storage is optional */ }
+    if (lastRun === day) return;
+    const stale = dbRef.current.focusSessions
+      .filter((session) => !session.completed && applicationDayKey(new Date(session.startedAt)) < day)
+      .map((session) => session.id);
+    try { localStorage.setItem(SESSION_PRUNE_KEY, day); } catch { /* best effort */ }
+    if (!stale.length) return;
+    const staleIds = new Set(stale);
+    const cloudIds = stale.filter(isUuid);
+    setDb((d) => ({ ...d, focusSessions: d.focusSessions.filter((session) => !staleIds.has(session.id)) }));
+    if (!cloudIds.length) return;
+    void push(`prune-sessions:${day}`, async () => {
+      const sb = activeClient();
+      const userId = userIdRef.current;
+      if (!userId) return;
+      const { error } = await sb.from('focus_sessions').delete().in('id', cloudIds).eq('user_id', userId);
+      if (error) throw new Error(`focus_sessions: ${error.message}`);
+    });
+  }, [push, activeClient]);
+
+  // Rollover watcher: prune as soon as a new application day starts.
+  useEffect(() => {
+    pruneStaleSessions();
+    let day = applicationDayKey();
+    const id = window.setInterval(() => {
+      const now = applicationDayKey();
+      if (now !== day) { day = now; pruneStaleSessions(); }
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [pruneStaleSessions]);
+
+  /** Full data wipe: local cache + cloud rows. Auth, Remember-Me session,
+   * theme and sidebar preferences survive; preparation data does not. */
+  const wipeAllData = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    // 1. Invalidate every in-flight pull/push before anything else changes.
+    syncEpoch.current += 1;
+    pendingOps.current.clear();
+    progressDirty.current.clear();
+    if (progressTimer.current) { window.clearTimeout(progressTimer.current); progressTimer.current = undefined; }
+    if (settingsTimer.current) { window.clearTimeout(settingsTimer.current); settingsTimer.current = undefined; }
+    setSyncStatus((s) => ({ ...s, pending: 0, syncing: false, lastError: null }));
+
+    // 2. Forget short-lived timer/session caches (never `mup.auth`).
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (CACHE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+      }
+      localStorage.removeItem(DB_KEY);
+    } catch { /* storage may be unavailable */ }
+
+    // 3. Empty local state, keeping preferences the user chose.
+    setDb((d) => ({ ...newDatabase(), version: DB_VERSION, settings: d.settings }));
+
+    // 4. Delete the cloud rows (FK-safe order). Idempotent: safe to re-run.
+    const userId = userIdRef.current;
+    if (authState !== 'signed-in' || !userId || !isCloudConfigured) return { ok: true };
+    try {
+      const sb = activeClient();
+      for (const table of USER_DATA_TABLES) {
+        const { error } = await sb.from(table).delete().eq('user_id', userId);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+      try { localStorage.setItem(wipeMarkerKey(userId), new Date().toISOString()); } catch { /* marker is best effort */ }
+      return { ok: true };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSyncStatus((s) => ({ ...s, lastError: msg }));
+      return { ok: false, error: msg };
+    }
+  }, [authState, activeClient]);
+
   const replaceDb = useCallback((next: MupDatabase) => setDb(next), []);
   const resetProgressOnly = useCallback(() => {
     setDb((d) => ({ ...d, progress: {}, revisionLogs: [] }));
@@ -564,14 +689,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // otherwise PostgREST calls go out unauthenticated.
     const r = new Repository(activeClient(), userId);
     repoRef.current = r;
+    const epoch = syncEpoch.current;
     try {
       const remote = await r.pullAll();
+      // A wipe happened while this pull was in flight — its payload is stale.
+      if (epoch !== syncEpoch.current) return;
       const remoteCount = Object.values(remote.counts).reduce((a, b) => a + (b as number), 0);
       const d = dbRef.current;
       const localCount = d.tasks.length + Object.keys(d.progress).length + d.pyqs.length + d.lectures.length +
         d.answers.length + d.currentAffairs.length + d.prelimsTests.length + d.mainsTests.length +
         d.focusSessions.length + d.habits.length + d.revisionLogs.length;
-      const alreadyMigrated = Boolean(localStorage.getItem(migratedFlagKey(userId)));
+      // A wipe on this device also suppresses the one-time import offer —
+      // re-uploading the records the user just deleted would undo the wipe.
+      const alreadyMigrated = Boolean(localStorage.getItem(migratedFlagKey(userId)))
+        || Boolean(localStorage.getItem(wipeMarkerKey(userId)));
       mergeRemoteIntoLocal(remote);
       if (!alreadyMigrated && localCount > 0) {
         setMigrationPrompt(true); // offer one-time import of this device's data
@@ -727,21 +858,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     getProgress, setItemStatus, setItemNotes, reviseItem, resetRevision, bulkSetStatus,
     addTask, addTasks, updateTask, toggleTask, deleteTask,
     addPrelimsTest, deletePrelimsTest, addMainsTest, deleteMainsTest,
-    addFocusSession,
+    addFocusSession, logManualStudy, pruneStaleSessions,
     addLecture, updateLecture, deleteLecture,
     addCurrentAffair, updateCurrentAffair, deleteCurrentAffair,
     addAnswer, updateAnswer, deleteAnswer,
-    updateSettings, replaceDb, resetProgressOnly,
+    updateSettings, replaceDb, resetProgressOnly, wipeAllData,
   }), [db, authState, syncStatus, accountEmail, migrationPrompt,
     dismissMigrationPrompt, continueLocal, signIn, signUp, logout, migrateLocalToCloud, flushSync,
     getProgress, setItemStatus, setItemNotes, reviseItem, resetRevision, bulkSetStatus,
     addTask, addTasks, updateTask, toggleTask, deleteTask,
     addPrelimsTest, deletePrelimsTest, addMainsTest, deleteMainsTest,
-    addFocusSession,
+    addFocusSession, logManualStudy, pruneStaleSessions,
     addLecture, updateLecture, deleteLecture,
     addCurrentAffair, updateCurrentAffair, deleteCurrentAffair,
     addAnswer, updateAnswer, deleteAnswer,
-    updateSettings, replaceDb, resetProgressOnly]);
+    updateSettings, replaceDb, resetProgressOnly, wipeAllData]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

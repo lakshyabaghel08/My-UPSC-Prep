@@ -1,4 +1,4 @@
-/** Authentication screen — matches the existing My UPSC Prep design system. */
+/** Authentication screen — matches the existing PREPTRACK design system. */
 import React, { useState } from 'react';
 import { useStore } from '../store/store';
 import { Modal } from '../ui/components';
@@ -42,9 +42,9 @@ export function AuthPage() {
     <div className="auth-wrap">
       <div className="auth-card card">
         <div className="auth-brand">
-          <div className="brand-mark">M</div>
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 17 }}>My UPSC Prep</div>
+            <div className="brand-wordmark">PREPTRACK</div>
             <div className="brand-sub">CSE 2027 · Geography Optional</div>
           </div>
         </div>
@@ -102,15 +102,12 @@ export function AuthPage() {
           <span className="tiny muted">or</span>
           <hr className="divider grow" />
         </div>
-        <button className="btn block" onClick={continueLocal}>Continue on this device (local only)</button>
+        <button className="btn block" onClick={continueLocal}>Continue on this device</button>
         {localRecords > 0 && (
           <p className="tiny muted" style={{ marginTop: 8, textAlign: 'center' }}>
             {localRecords} local records found on this device — you can import them into your account after signing in.
           </p>
         )}
-        <p className="tiny muted" style={{ marginTop: 14, textAlign: 'center' }}>
-          100% free · no tracking · your data belongs to you
-        </p>
       </div>
     </div>
   );

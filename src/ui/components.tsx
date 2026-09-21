@@ -99,8 +99,8 @@ export function Field({ label, children, className = '' }: { label: string; chil
 
 export function StatusChip({ status }: { status: string }) {
   if (status === 'completed') return <span className="chip ok">● Completed</span>;
-  if (status === 'in_progress') return <span className="chip warn">◐ In progress</span>;
-  return <span className="chip">○ Not started</span>;
+  if (status === 'in_progress') return <span className="chip info">◐ In Progress</span>;
+  return <span className="chip">○ To Do</span>;
 }
 
 export function todayInput(): string {

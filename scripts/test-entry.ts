@@ -4,6 +4,8 @@ export * from '../src/lib/revision';
 export * from '../src/lib/tasks';
 export * from '../src/lib/lectures';
 export * from '../src/lib/syllabusProgress';
+export * from '../src/lib/studyLog';
+export * from '../src/lib/progressState';
 export * from '../src/config/exams';
 export { syllabus } from '../src/data/syllabus';
 export { StoreProvider, useStore } from '../src/store/store';

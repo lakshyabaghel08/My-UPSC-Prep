@@ -62,7 +62,7 @@ export function StudyHours() {
       <div className="page-head">
         <div>
           <h1>Study Hours & Consistency</h1>
-          <div className="sub">Focus time comes from the Study Timer · consistency beats intensity</div>
+          <div className="sub">Focus time comes from the Study Timer</div>
         </div>
       </div>
 

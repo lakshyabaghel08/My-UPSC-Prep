@@ -39,7 +39,7 @@ export function CalendarPage() {
       <div className="page-head">
         <div>
           <h1>Calendar</h1>
-          <div className="sub">{monthLabel(year, month)} · {monthTaskCount} tasks & events · revision dues shown in teal</div>
+          <div className="sub">{monthLabel(year, month)} · {monthTaskCount} tasks & events</div>
         </div>
         <div className="page-actions">
           <button className="btn" onClick={prev}>‹</button>

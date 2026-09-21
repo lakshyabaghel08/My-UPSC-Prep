@@ -2,7 +2,7 @@
 // Paper 1: Physical Geography (Principles of Physical Geography) + Human Geography
 // Paper 2: Geography of India
 // Structure mirrors the shared Schema: paper -> subjects -> chapters -> topics -> subtopics.
-// Authored for My UPSC Prep; informed by the official UPSC Geography optional syllabus.
+// Authored for PREPTRACK; informed by the official UPSC Geography optional syllabus.
 
 export const geographyOptional = {
   papers: [

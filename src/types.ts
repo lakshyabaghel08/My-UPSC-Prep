@@ -1,4 +1,4 @@
-/** Core domain types for My UPSC Prep. */
+/** Core domain types for PREPTRACK. */
 
 // ---------- Syllabus hierarchy ----------
 export interface Paper {

@@ -24,3 +24,4 @@ supabase/.branches/
 # reference assets stay, but keep git tidy of OS junk inside
 reference/**/.DS_Store
 e2e-output.txt
+.test-*-bundle

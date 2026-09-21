@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Bootstrap the "My UPSC Prep" Supabase project — one-time, idempotent.
+ * Bootstrap the "PREPTRACK" Supabase project — one-time, idempotent.
  * Runs on GitHub Actions (or any machine with network access to Supabase).
  *
  * Requires env: SUPABASE_ACCESS_TOKEN (repo secret, delete after use).
  * Safe to re-run: lists existing projects first and REUSES one named
- * "my-upsc-prep" instead of creating a duplicate; the SQL migration itself
+ * "preptrack" instead of creating a duplicate; the SQL migration itself
  * is idempotent too.
  *
  * Payload built against the CURRENT Management API schema (2025+):
@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const API = 'https://api.supabase.com/v1';
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const PROJECT_NAME = process.env.PROJECT_NAME || 'my-upsc-prep';
+const PROJECT_NAME = process.env.PROJECT_NAME || 'preptrack';
 const PREFERRED_REGION = 'ap-south-1'; // Mumbai
 
 if (!TOKEN || !TOKEN.startsWith('sbp_')) {

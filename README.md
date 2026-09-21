@@ -1,10 +1,10 @@
-# My UPSC Prep
+# PREPTRACK
 
-A personal, **offline-first** preparation tracker for **UPSC CSE 2027** with **Geography Optional**.
+A personal preparation tracker for **UPSC CSE 2027** with **Geography Optional**.
 
-Works fully offline with zero accounts — everything lives in your browser's local storage, with
-one-click JSON backup/restore. **Optional private cloud sync** (Supabase + Row Level Security)
-lets you sign in on any device: same app, same features, your data synced and visible only to you.
+Works offline first — data is cached in your browser with one-click JSON backup/restore — and
+syncs privately through **Supabase + Row Level Security** when you sign in, so the same
+preparation follows you across devices and stays visible only to you.
 
 ![stack](https://img.shields.io/badge/stack-React%2018%20%2B%20Vite%20%2B%20TS-blue) ![offline](https://img.shields.io/badge/offline-first-teal) ![free](https://img.shields.io/badge/100%25-free-no%20premium-green)
 
@@ -12,7 +12,7 @@ lets you sign in on any device: same app, same features, your data synced and vi
 
 | Module | What it does |
 | --- | --- |
-| **Dashboard** | Action-first command centre with today's plan, real continue-study activity, Geography Optional position, study graphs and analytics |
+| **Dashboard** | Action-first command centre with today's plan, Geography Optional position, study graphs and analytics |
 | **Operational Syllabus** | Paper → Subject → Chapter → Topic → Subtopic tree (9 papers, 37 subjects, 88 chapters, 257 topics, **1000 subtopics**) with cascading completion, short notes, revision logging and task planning |
 | **Daily Planner** | Time blocks, multiline quick-add + templates, overdue carry-forward, week strip, syllabus-linked tasks |
 | **Calendar** | Month grid of tasks, events, revision dues and tests |
@@ -21,10 +21,10 @@ lets you sign in on any device: same app, same features, your data synced and vi
 | **Test Tracker & Analytics** | Prelims mocks (UPSC negative marking) + Mains tests with score/accuracy/attempt-rate trends |
 | **Answer Writing** | Daily answer log with marks, word counts and strength/improvement tags |
 | **Current Affairs** | Daily capture with subject categories, Prelims/Mains relevance and revision flags |
-| **Focus Workspace** | Flip Clock Pomodoro + stopwatch, breaks, soundscapes, mindfulness bell, fullscreen and mini player; sessions feed Study Hours |
+| **Focus Workspace** | Flip Clock Pomodoro + stopwatch, atmospheric themes, breaks, soundscapes, mindfulness bell, distraction-free fullscreen, manual study logging and mini player; sessions feed Study Hours |
 | **Study Hours** | Focus-session consistency heatmap, streaks and weekly trend |
 | **Prep Analytics** | Official 2027 countdown, completion velocity, weakest areas, revision health, test performance |
-| **Settings** | Theme, daily target, backup/restore, reset tools |
+| **Settings** | Theme, daily target, backup/restore, reset and full wipe (local + cloud) |
 
 ## Run it
 
@@ -85,7 +85,7 @@ Built on **Supabase** (Postgres + Auth + Row Level Security). Behavior:
 
 ### Supabase setup (already done for this deployment)
 
-1. Project `my-upsc-prep` (region `ap-south-1`) — created and migrated via
+1. Project `preptrack` (region `ap-south-1`) — created and migrated via
    **Actions → "Supabase operations" → bootstrap** (idempotent; reuses by name; runs
    `supabase/migrations/*.sql`, live-verifies RLS, prints the URL + publishable key).
 2. Publishable config is committed at `.env.production` — **by design contains only**

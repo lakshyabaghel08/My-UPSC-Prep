@@ -1,5 +1,5 @@
 -- ============================================================================
--- My UPSC Prep — initial schema (users, tables, indexes, RLS)
+-- PREPTRACK — initial schema (users, tables, indexes, RLS)
 -- Generated from the application's existing localStorage data model
 -- (src/types.ts → MupDatabase). Static syllabus content stays bundled with
 -- the app and is intentionally NOT duplicated as per-user rows.

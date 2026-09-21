@@ -1,7 +1,7 @@
 /**
  * Date helpers — all day keys are local `yyyy-MM-dd` strings.
  *
- * My UPSC Prep uses a 4:00 AM application-day boundary. `todayKey` (and its
+ * PREPTRACK uses a 4:00 AM application-day boundary. `todayKey` (and its
  * explicit alias `applicationDayKey`) is the single source of truth for that
  * rule: 00:00–03:59 belongs to the previous application day. Calendar-key
  * arithmetic deliberately does not apply the shift a second time.
@@ -90,6 +90,14 @@ export const WEEKDAY_LABELS = WEEKDAYS;
 export function monthLabel(year: number, month: number): string {
   const FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return `${FULL[month]} ${year}`;
+}
+
+/** Time-of-day greeting for the dashboard header. */
+export function greetingFor(d: Date = new Date()): string {
+  const hour = d.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 /** Minutes -> "3h 45m" */

@@ -84,6 +84,52 @@ check('fmtDuration', fmtDuration(225) === '3h 45m' && fmtDuration(45) === '45m')
 const streakSet = new Set([t, addDays(t, -1), addDays(t, -2)]);
 check('streak counts consecutive incl. today', computeStreak(streakSet, t) === 3);
 check('streak survives inactive today', computeStreak(new Set([addDays(t, -1), addDays(t, -2)]), t) === 2);
+// ---------- manual study logging (application-day aware) ----------
+const { composeManualStartedAt, manualLogApplicationDay, parseClockTime } = mod;
+check('manual log lands on the chosen application day',
+  manualLogApplicationDay('2026-09-19', '20:30') === '2026-09-19');
+check('a pre-4:00 AM start time is shifted so it still files under the chosen day',
+  composeManualStartedAt('2026-09-19', '02:30').slice(0, 10) === '2026-09-20'
+  && manualLogApplicationDay('2026-09-19', '02:30') === '2026-09-19');
+check('historical dates are supported', manualLogApplicationDay('2026-01-05', '18:00') === '2026-01-05');
+check('clock times are validated', parseClockTime('25:00') === null && JSON.stringify(parseClockTime('9:05')) === '[9,5]');
+const manualDb = mod.newDatabase();
+manualDb.focusSessions = [{
+  id: 'manual-1', startedAt: composeManualStartedAt('2026-09-19', '20:30'), durationMinutes: 90,
+  taskName: 'Manual study log', sessionType: 'focus', completed: true,
+}];
+check('manual logs feed the same Study Hours aggregates as timed sessions',
+  mod.focusMinutesByApplicationDay(manualDb).get('2026-09-19') === 90
+  && mod.dashboardStats(manualDb).days7.reduce((sum, d) => sum + d.minutes, 0) >= 0);
+
+// ---------- three-state preparation progress ----------
+const { normalizeItemStatus, nextProgressState, migrateProgress, PROGRESS_LABEL } = mod;
+check('legacy binary progress migrates false → todo, true → completed',
+  normalizeItemStatus(false) === 'not_started' && normalizeItemStatus(true) === 'completed');
+check('todo / not_started are the same stored state',
+  normalizeItemStatus('todo') === 'not_started' && PROGRESS_LABEL.not_started === 'To Do');
+check('cycle is To Do → In Progress → Completed → To Do',
+  nextProgressState('not_started') === 'in_progress'
+  && nextProgressState('in_progress') === 'completed'
+  && nextProgressState('completed') === 'not_started');
+check('progress maps migrate without dropping records',
+  Object.keys(migrateProgress({ a: { itemId: 'a', status: true }, b: { itemId: 'b', status: 'in_progress' } })).length === 2
+  && migrateProgress({ a: { itemId: 'a', status: true } }).a.status === 'completed');
+check('an unrelated boolean setting is never coerced',
+  normalizeItemStatus(undefined) === 'not_started' && normalizeItemStatus('dark') === 'not_started');
+
+// ---------- application-day session pruning ----------
+const pruneDb = mod.newDatabase();
+pruneDb.focusSessions = [
+  { id: 'old-abandoned', startedAt: new Date(2026, 8, 18, 22, 0).toISOString(), durationMinutes: 0, taskName: '', sessionType: 'focus', completed: false },
+  { id: 'old-completed', startedAt: new Date(2026, 8, 18, 22, 0).toISOString(), durationMinutes: 55, taskName: 'Kept for history', sessionType: 'focus', completed: true },
+];
+const staleIds = pruneDb.focusSessions.filter((s2) => !s2.completed && mod.applicationDayKey(new Date(s2.startedAt)) < mod.applicationDayKey()).map((s2) => s2.id);
+check('rollover cleanup targets abandoned sessions only', JSON.stringify(staleIds) === '["old-abandoned"]');
+const kept = pruneDb.focusSessions.filter((s2) => !staleIds.includes(s2.id));
+check('historical Study Hours survive the cleanup',
+  mod.focusMinutesByApplicationDay({ ...pruneDb, focusSessions: kept }).get('2026-09-18') === 55);
+
 const { parseQuickTasks, parseLectureRange, examDatesFor } = mod;
 check('multiline Quick Add creates one trimmed task per non-empty line', JSON.stringify(parseQuickTasks('  Revise Fundamental Rights  \n\nComplete Geography Lecture 99\n Read today\'s newspaper\nPractice Ethics answers  ')) === JSON.stringify(['Revise Fundamental Rights', 'Complete Geography Lecture 99', "Read today's newspaper", 'Practice Ethics answers']));
 check('single-line Quick Add remains valid', JSON.stringify(parseQuickTasks('Read Laxmikanth')) === JSON.stringify(['Read Laxmikanth']));

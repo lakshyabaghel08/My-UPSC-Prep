@@ -3,9 +3,20 @@
 import type { MupDatabase } from '../types';
 import { todayKey } from '../lib/date';
 import { normalizeLectureProgress } from '../lib/lectures';
+import { migrateProgress } from '../lib/progressState';
 
-const DB_KEY = 'mup.db.v1';
+export const DB_KEY = 'mup.db.v1';
 export const DB_VERSION = 2;
+
+/** localStorage keys that hold preparation data or short-lived session state.
+ * A wipe clears exactly these; `mup.auth` (Remember Me), `mup.theme` and
+ * `mup.sidebar.collapsed` are deliberately left alone. */
+export const CACHE_KEY_PREFIXES = [
+  'mup.db.',
+  'mup.focus-timer.',
+  'mup.sessions.',
+  'mup.migrated.',
+] as const;
 
 function defaultDb(): MupDatabase {
   return {
@@ -46,7 +57,7 @@ export function migrate(raw: unknown): MupDatabase {
     ...def,
     ...db,
     settings: { ...def.settings, ...(db.settings ?? {}) },
-    progress: db.progress ?? {},
+    progress: migrateProgress(db.progress ?? {}),
     tasks: db.tasks ?? [],
     revisionLogs: db.revisionLogs ?? [],
     pyqs: db.pyqs ?? [],
@@ -86,7 +97,7 @@ export function saveDb(db: MupDatabase) {
 }
 
 export function exportDb(db: MupDatabase): string {
-  return JSON.stringify({ ...db, exportedAt: new Date().toISOString(), app: 'My UPSC Prep' }, null, 2);
+  return JSON.stringify({ ...db, exportedAt: new Date().toISOString(), app: 'PREPTRACK' }, null, 2);
 }
 
 export function downloadBackup(db: MupDatabase) {
@@ -94,7 +105,7 @@ export function downloadBackup(db: MupDatabase) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `my-upsc-prep-backup-${todayKey()}.json`;
+  a.download = `preptrack-backup-${todayKey()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -102,7 +113,7 @@ export function downloadBackup(db: MupDatabase) {
 export function parseBackup(jsonText: string): MupDatabase {
   const parsed = JSON.parse(jsonText);
   if (!parsed || typeof parsed !== 'object' || !('tasks' in parsed)) {
-    throw new Error('This file does not look like a My UPSC Prep backup.');
+    throw new Error('This file does not look like a PREPTRACK backup.');
   }
   return migrate(parsed);
 }

@@ -1,17 +1,19 @@
 {
-  "name": "my-upsc-prep",
+  "name": "preptrack",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "My UPSC Prep \u2014 personal, offline-first UPSC CSE 2027 preparation tracker (Geography Optional)",
+  "description": "PREPTRACK \u2014 personal UPSC CSE 2027 preparation tracker (Geography Optional)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vite build --mode localtest && node scripts/logic-test.mjs && node scripts/smoke-test.mjs",
+    "test": "vite build --mode localtest && node scripts/logic-test.mjs && node scripts/flipclock-test.mjs && node scripts/wipe-test.mjs && node scripts/smoke-test.mjs",
     "test:logic": "node scripts/logic-test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs",
-    "generate:syllabus": "node scripts/extract-reference-syllabus.mjs"
+    "generate:syllabus": "node scripts/extract-reference-syllabus.mjs",
+    "test:wipe": "node scripts/wipe-test.mjs",
+    "test:flipclock": "node scripts/flipclock-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

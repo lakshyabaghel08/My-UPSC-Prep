@@ -1,7 +1,7 @@
 name: Supabase operations
 
 # Manual one-stop workflow for the Supabase backend:
-#   mode = bootstrap  → create the my-upsc-prep project, apply the SQL
+#   mode = bootstrap  → create the preptrack project, apply the SQL
 #                        migration, enable email auth, print the Project URL
 #                        + publishable key (browser-safe; service_role is
 #                        never read or printed).

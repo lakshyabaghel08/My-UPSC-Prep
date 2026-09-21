@@ -8,6 +8,7 @@ import { Card, Modal, Field, RChip, StatusChip } from '../ui/components';
 import { useToast } from '../ui/toast';
 import type { ItemStatus, ItemType, Confidence } from '../types';
 import { hierarchyStatus } from '../lib/syllabusProgress';
+import { nextProgressState, normalizeItemStatus, PROGRESS_LABEL } from '../lib/progressState';
 import { CONFIDENCE_LABELS, nextRevisionDate, rLabel } from '../lib/revision';
 import { todayKey, addDays, fmtTime } from '../lib/date';
 import { navigate } from '../ui/router';
@@ -195,17 +196,21 @@ export function Syllabus() {
   );
 }
 
+/** Three-state preparation control: To Do → In Progress → Completed → To Do.
+ * Each click stores the next real state (and reconciles the hierarchy). */
 export function StatusToggle({ status, onSet }: { status: ItemStatus; onSet: (s: ItemStatus) => void }) {
-  const completed = status === 'completed';
+  const state = normalizeItemStatus(status);
+  const next = nextProgressState(state);
   return (
     <button
-      className={`completion-toggle ${completed ? 'complete' : status === 'in_progress' ? 'partial' : ''}`}
-      title={completed ? 'Mark incomplete (also clears descendants)' : 'Mark complete (also completes descendants)'}
-      aria-pressed={completed}
-      onClick={() => onSet(completed ? 'not_started' : 'completed')}
+      className={`completion-toggle state-${state}`}
+      title={`${PROGRESS_LABEL[state]} → ${PROGRESS_LABEL[next]}`}
+      aria-label={`${PROGRESS_LABEL[state]} — click to mark ${PROGRESS_LABEL[next]}`}
+      aria-pressed={state === 'completed'}
+      onClick={() => onSet(next)}
     >
-      <span className="completion-box">{completed ? '✓' : status === 'in_progress' ? '–' : ''}</span>
-      {completed ? 'Complete' : status === 'in_progress' ? 'Partial' : 'Complete'}
+      <span className="completion-box">{state === 'completed' ? '✓' : state === 'in_progress' ? '◐' : ''}</span>
+      {PROGRESS_LABEL[state]}
     </button>
   );
 }
@@ -224,7 +229,6 @@ function NotesModal({ item, onClose }: { item: { id: string; type: string; title
       <Field label="Your notes (source references, mnemonics, map pointers…)">
         <textarea className="notes-area" style={{ minHeight: 200 }} value={text} onChange={(e) => setText(e.target.value)} placeholder={`Key points for ${item.title}…`} autoFocus />
       </Field>
-      <p className="tiny muted">Notes are saved locally on this device and included in backups.</p>
     </Modal>
   );
 }

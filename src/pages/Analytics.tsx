@@ -65,7 +65,6 @@ export function Analytics() {
       <div className="page-head">
         <div>
           <h1>Preparation Analytics</h1>
-          <div className="sub">The honest picture — coverage, pace, revision health and test performance</div>
         </div>
       </div>
 
