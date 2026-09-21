@@ -68,7 +68,7 @@ export function LineChart({ series, height = 190, yMax, yMin = 0, suffix = '', x
         return (
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke={GRID} strokeWidth="1" />
-            <text x={padL - 6} y={y(v) + 3} textAnchor="end" fontSize="9" fill="var(--text-faint)">{Math.round(v)}{suffix}</text>
+            <text x={padL - 6} y={y(v) + 3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{Math.round(v)}{suffix}</text>
           </g>
         );
       })}
@@ -132,7 +132,7 @@ export function Donut({ segments, size = 130, thickness = 14, centerLabel, cente
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>{centerLabel}</div>
+            <div style={{ fontWeight: 800, fontSize: 18.5 }}>{centerLabel}</div>
             {centerSub && <div className="tiny muted">{centerSub}</div>}
           </div>
         </div>
