@@ -28,7 +28,7 @@ function Router() {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icon.svg`} alt="PREPTRACK" style={{ width: 44, height: 44, margin: '0 auto 10px' }} />
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" style={{ width: 44, height: 44, margin: '0 auto 10px' }} />
           <div className="muted small">Loading your preparation…</div>
         </div>
       </div>

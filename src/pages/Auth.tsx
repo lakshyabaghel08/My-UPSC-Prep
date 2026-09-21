@@ -42,7 +42,7 @@ export function AuthPage() {
     <div className="auth-wrap">
       <div className="auth-card card">
         <div className="auth-brand">
-          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icon.svg`} alt="PREPTRACK" />
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" />
           <div>
             <div className="brand-wordmark">PREPTRACK</div>
             <div className="brand-sub">CSE 2027 · Geography Optional</div>

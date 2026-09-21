@@ -84,9 +84,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {open && <div className="sidebar-backdrop show" onClick={() => setOpen(false)} />}
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icon.svg`} alt="PREPTRACK" />
+          <img className="brand-mark" src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" />
           <div className="brand-copy">
-            <div className="brand-wordmark">PREPTRACK</div>
+            <img className="brand-wordmark-img" src={`${import.meta.env.BASE_URL}logo/preptrack-wordmark-transparent.png`} alt="PREPTRACK" />
             <div className="brand-sub">CSE {db.settings.targetExamYear} · {db.settings.optional}</div>
           </div>
           <button className="sidebar-collapse-btn" onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{collapsed ? '›' : '‹'}</button>

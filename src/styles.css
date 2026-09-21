@@ -124,13 +124,17 @@ input, select, textarea { font-family: inherit; color: var(--text); }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 9px;
   display: block; object-fit: contain;
-  box-shadow: 0 4px 12px rgba(79, 110, 247, 0.35);
+  /* the supplied monogram is charcoal-on-transparent — give it a light tile so
+     it stays legible on the deep-blue sidebar and on both auth themes */
+  background: #f3f6ff; padding: 4px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.35);
   flex-shrink: 0;
 }
 .brand-wordmark {
   font-size: 15.5px; font-weight: 800; letter-spacing: 0.13em;
   color: #fbfcff; text-transform: uppercase;
 }
+.brand-wordmark-img { height: 15px; width: auto; display: block; }
 .brand-sub { font-size: 11px; color: var(--text-faint); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 
 .nav-section { padding: 11px 12px 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; color: var(--text-faint); text-transform: uppercase; }
