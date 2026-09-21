@@ -1,14 +1,24 @@
 {
-  "name": "My UPSC Prep — CSE 2027 Tracker",
-  "short_name": "My UPSC Prep",
-  "description": "Personal, offline-first UPSC CSE 2027 preparation tracker with Geography Optional.",
+  "name": "PREPTRACK \u2014 UPSC CSE 2027 Tracker",
+  "short_name": "PREPTRACK",
+  "description": "PREPTRACK \u2014 personal UPSC CSE 2027 preparation tracker with Geography Optional.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b1020",
   "theme_color": "#0b1020",
   "icons": [
-    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
   ]
 }

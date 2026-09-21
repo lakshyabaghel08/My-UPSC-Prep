@@ -1,6 +1,6 @@
 # Supabase sync (prepared — awaiting project credentials)
 
-The database layer for My UPSC Prep's Supabase integration lives here as a
+The database layer for PREPTRACK's Supabase integration lives here as a
 **reproducible SQL migration**. The app itself is unchanged and continues to
 run 100% locally/localStorage until the project credentials below are
 available — by design, so nothing half-configured ever ships.
@@ -26,7 +26,7 @@ available — by design, so nothing half-configured ever ships.
 ## Applying the migration to your Supabase project
 
 **Option 1 — Dashboard (2 minutes):**
-1. Create a project at supabase.com (suggested name: `my-upsc-prep`, region `ap-south-1 (Mumbai)`).
+1. Create a project at supabase.com (suggested name: `preptrack`, region `ap-south-1 (Mumbai)`).
 2. SQL Editor → New query → run the files in `supabase/migrations/` in numeric order. Existing projects can safely run only `0002_lecture_ranges.sql`.
 3. Project Settings → API: copy the **Project URL** and the **anon/public
    publishable key** (browser-safe — never the service_role key).

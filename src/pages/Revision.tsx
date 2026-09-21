@@ -77,7 +77,6 @@ export function Revision() {
               <CardHead title="Never revised" hint="completed units outside the cycle" />
               <div className="card-pad" style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <p className="small soft">Units completed but not yet in the revision cycle: <b style={{ color: 'var(--text)' }}>{q.notStarted}</b></p>
-                <p className="tiny muted">Tip: log R1 right after finishing a topic the same week — memory retention curves are steepest in the first 72 hours.</p>
               </div>
             </Card>
             <Card>

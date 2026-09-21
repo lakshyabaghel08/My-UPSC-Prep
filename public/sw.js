@@ -1,8 +1,8 @@
-/* My UPSC Prep — offline-first service worker.
+/* PREPTRACK — offline-first service worker.
  * Cache-first for built assets; network-first fallback for index.html so
  * updates land on next online visit. No external requests are made. */
-const CACHE = 'mup-cache-v1';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'preptrack-cache-v2';
+const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-maskable.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

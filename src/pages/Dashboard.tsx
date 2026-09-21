@@ -1,11 +1,11 @@
 /** Dashboard — a calm, action-first command centre backed only by real data. */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
 import { navigate } from '../ui/router';
 import { confidenceSplit, dashboardStats, lectureSummary, paperStats, taskTrend } from '../store/selectors';
 import { Bar, Card, CardHead, Empty, RChip } from '../ui/components';
 import { ColumnsChart, Donut, HBars, LineChart } from '../ui/charts';
-import { fmtDuration, relDay, todayKey, WEEKDAY_LABELS } from '../lib/date';
+import { formatDate, fmtDuration, greetingFor, relDay, todayKey, WEEKDAY_LABELS } from '../lib/date';
 import { itemTitle, syllabus } from '../data/syllabus';
 import { lectureProgress } from '../lib/lectures';
 import { daysUntilExam, examDatesFor } from '../config/exams';
@@ -18,6 +18,8 @@ export function Dashboard() {
   const papers = useMemo(() => paperStats(db), [db]);
   const lectures = useMemo(() => lectureSummary(db), [db]);
   const today = todayKey();
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const greeting = useMemo(() => greetingFor(), []);
 
   const todaysTasks = db.tasks
     .filter((task) => task.deadline <= today && task.status !== 'completed')
@@ -32,9 +34,6 @@ export function Dashboard() {
     .filter((lecture) => lectureProgress(lecture).remaining > 0)
     .sort((a, b) => (b.lastWatchedAt ?? b.createdAt).localeCompare(a.lastWatchedAt ?? a.createdAt))[0] ?? null;
   const activeLectureProgress = activeLecture ? lectureProgress(activeLecture) : null;
-  const activeSyllabus = Object.values(db.progress)
-    .filter((progress) => progress.status === 'in_progress')
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
 
   const hoursThisWeek = stats.days7.map((day) => ({
     label: WEEKDAY_LABELS[new Date(`${day.day}T00:00:00`).getDay()],
@@ -61,16 +60,19 @@ export function Dashboard() {
     <>
       <div className="page-head dashboard-head">
         <div>
-          <span className="eyebrow">YOUR PREPARATION COMMAND CENTRE</span>
-          <h1>Today, with intention.</h1>
-          <div className="sub">UPSC CSE {db.settings.targetExamYear} · {db.settings.optional} Optional · application day resets at 4:00 AM</div>
+          <h1>{greeting}.</h1>
+          <div className="sub">UPSC CSE {db.settings.targetExamYear} · {db.settings.optional} Optional</div>
         </div>
         {examDates && (
-          <div className="exam-date-strip">
-            <span><b>{prelimsDays != null && prelimsDays >= 0 ? prelimsDays : '—'}</b> days to Prelims</span>
-            <span>23 May 2027</span>
-            <i />
-            <span>Mains · 20 Aug 2027</span>
+          <div className={`exam-timeline ${timelineOpen ? 'open' : ''}`}>
+            <button className="exam-timeline-toggle" onClick={() => setTimelineOpen((value) => !value)} aria-expanded={timelineOpen}>
+              <span>Prelims · <b>{prelimsDays != null && prelimsDays >= 0 ? prelimsDays : '—'} days</b></span>
+              <span className="caret">▶</span>
+            </button>
+            <div className="exam-timeline-list">
+              <div><span>Prelims</span><b>{formatDate(examDates.prelims)} {examDates.prelims.slice(0, 4)}</b></div>
+              <div><span>Mains</span><b>{formatDate(examDates.mainsCommencement)} {examDates.mainsCommencement.slice(0, 4)}</b></div>
+            </div>
           </div>
         )}
       </div>
@@ -87,31 +89,6 @@ export function Dashboard() {
             <span><b>{stats.streak}d</b> streak</span>
           </div>
           <button className="btn primary" onClick={() => navigate('/timer')}>Start a focus session →</button>
-        </Card>
-
-        <Card className="continue-study-card">
-          <div className="action-card-kicker">CONTINUE STUDYING</div>
-          {activeLecture && activeLectureProgress ? (
-            <>
-              <div className="continue-icon">▶</div>
-              <div className="continue-context">GEOGRAPHY OPTIONAL · {activeLecture.subject}</div>
-              <h2>{activeLecture.title}</h2>
-              <p className="soft">Next: Lecture {activeLectureProgress.next} · {activeLectureProgress.remaining} remaining</p>
-              <Bar value={activeLectureProgress.pct} tone="geo" />
-              <button className="btn geo" onClick={() => navigate('/lectures')}>Continue lecture series →</button>
-            </>
-          ) : activeSyllabus ? (
-            <>
-              <div className="continue-icon">☰</div>
-              <div className="continue-context">OPERATIONAL SYLLABUS</div>
-              <h2>{itemTitle(activeSyllabus.itemId, activeSyllabus.itemType)}</h2>
-              <p className="soft">Last updated {new Date(activeSyllabus.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
-              <button className="btn" onClick={() => navigate('/syllabus')}>Open syllabus →</button>
-            </>
-          ) : (
-            <Empty icon="◇" title="No active study item" hint="Start a lecture or mark a syllabus item in progress and it will appear here."
-              action={<button className="btn" onClick={() => navigate('/syllabus')}>Open syllabus</button>} />
-          )}
         </Card>
 
         <Card className="todays-plan-card">

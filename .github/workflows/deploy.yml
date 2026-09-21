@@ -1,4 +1,4 @@
-name: Deploy My UPSC Prep to GitHub Pages
+name: Deploy PREPTRACK to GitHub Pages
 
 on:
   push:

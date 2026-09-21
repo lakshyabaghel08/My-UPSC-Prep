@@ -70,7 +70,7 @@ export function Lectures() {
       <div className="page-head">
         <div>
           <h1>Geography Optional — Lecture Series</h1>
-          <div className="sub">Watch → complete → continue with the next lecture · {summary.completed}/{summary.total} complete across {summary.series} series</div>
+          <div className="sub">{summary.completed}/{summary.total} lectures complete across {summary.series} series</div>
         </div>
         <button className="btn primary" onClick={() => setShowAdd(true)}>+ Add lecture series</button>
       </div>

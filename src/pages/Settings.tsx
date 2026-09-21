@@ -1,21 +1,22 @@
-/** Settings — personalization, backup/restore, data management. Fully local. */
+/** Settings — personalization, backup/restore, data management. */
 import React, { useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { Card, CardHead, Confirm, Field } from '../ui/components';
 import { useToast } from '../ui/toast';
 import { isCloudConfigured } from '../lib/supabase';
-import { downloadBackup, parseBackup, newDatabase, DB_VERSION } from '../store/db';
+import { downloadBackup, parseBackup, DB_VERSION } from '../store/db';
 import type { MupDatabase } from '../types';
 import { syllabus } from '../data/syllabus';
 import { fmtDuration } from '../lib/date';
 
 export function Settings() {
-  const { db, updateSettings, replaceDb, resetProgressOnly, authState, accountEmail, syncStatus, logout, flushSync, migrateLocalToCloud } = useStore();
+  const { db, updateSettings, replaceDb, resetProgressOnly, wipeAllData, authState, accountEmail, syncStatus, logout, flushSync, migrateLocalToCloud } = useStore();
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
+  const [wiping, setWiping] = useState(false);
 
   const stats = {
     tasks: db.tasks.length,
@@ -48,6 +49,14 @@ export function Settings() {
     reader.readAsText(f);
   };
 
+  const doWipe = async () => {
+    setWiping(true);
+    const result = await wipeAllData();
+    setWiping(false);
+    if (result.ok) push('Everything wiped — fresh start', 'ok');
+    else push(result.error ?? 'Wipe failed — try again', 'bad');
+  };
+
   const doRestore = () => {
     if (!confirmRestore) return;
     try {
@@ -65,7 +74,6 @@ export function Settings() {
       <div className="page-head">
         <div>
           <h1>Settings & Backup</h1>
-          <div className="sub">Everything lives on this device. No account, no cloud, no tracking.</div>
         </div>
       </div>
 
@@ -90,20 +98,17 @@ export function Settings() {
                   <button className="btn sm geo" onClick={() => { void migrateLocalToCloud((m) => push(m)); push('Importing local data…'); }}>⤒ Re-import local data</button>
                   <button className="btn sm bad" onClick={() => { void logout().then(() => push('Signed out — see you soon')); }}>Sign out</button>
                 </div>
-                <p className="tiny muted">Sign-in happens on the start screen. "Re-import" replaces cloud data with this device's data (useful after restoring a backup file locally).</p>
               </>
             ) : isCloudConfigured ? (
               <>
                 <p className="small soft">
-                  You're using <b style={{ color: 'var(--text)' }}>local mode</b> — everything lives in this browser only.
-                  {' '}Sign in to sync your preparation across devices with RLS-protected cloud storage.
+                  <b style={{ color: 'var(--text)' }}>Local mode</b> — this browser only. Sign in to sync across devices.
                 </p>
                 <button className="btn primary sm" onClick={() => { window.location.hash = '/'; window.location.reload(); }}>☁ Sign in to enable sync</button>
               </>
             ) : (
               <p className="small soft">
-                This build runs <b style={{ color: 'var(--text)' }}>100% on this device</b> — cloud sync isn't
-                configured in it, so there's no account to sign in to. Your data stays in this browser.
+                Cloud sync isn't configured in this build, so the app runs on this device.
               </p>
             )}
           </div>
@@ -148,12 +153,12 @@ export function Settings() {
               <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
             </div>
             <div className="card card-pad small soft" style={{ background: 'var(--surface-2)', border: 'none' }}>
-              <b style={{ color: 'var(--text)' }}>What's inside a backup:</b> syllabus progress & notes, tasks, revision logs, tests, focus sessions, lecture tracker, current affairs, answer log and settings. Legacy records remain in the file for data safety.
+              <b style={{ color: 'var(--text)' }}>What's inside a backup:</b> syllabus progress & notes, tasks, revision logs, tests, focus sessions, lecture tracker, current affairs, answer log and settings.
               <div className="tiny muted" style={{ marginTop: 6 }}>
                 {stats.progress} progress records · {stats.tasks} tasks · {stats.logs} revision logs · {stats.tests} tests · {stats.lectures} lecture series · {stats.ca} CA items · {stats.answers} answers · {stats.sessions} sessions
               </div>
             </div>
-            <p className="tiny muted">Tip: take a backup every Sunday. Restore replaces everything on this device with the file's contents.</p>
+            <p className="tiny muted">Restore replaces everything on this device with the file's contents.</p>
           </div>
         </Card>
 
@@ -161,11 +166,11 @@ export function Settings() {
           <CardHead title="Install as app (PWA)" hint="works offline after first load" />
           <div className="card-pad" style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p className="small soft">
-              <b style={{ color: 'var(--text)' }}>Chrome / Edge (desktop):</b> click the ⊕ install icon in the address bar, or ⋮ menu → "Install My UPSC Prep".<br />
+              <b style={{ color: 'var(--text)' }}>Chrome / Edge (desktop):</b> click the ⊕ install icon in the address bar, or ⋮ menu → "Install PREPTRACK".<br />
               <b style={{ color: 'var(--text)' }}>Android:</b> ⋮ menu → "Add to Home screen".<br />
               <b style={{ color: 'var(--text)' }}>iOS Safari:</b> Share → "Add to Home Screen".
             </p>
-            <p className="tiny muted">Installed, the app runs fully offline — your data stays in the device's local storage. Keep regular backups.</p>
+            <p className="tiny muted">Installed, the app works offline.</p>
           </div>
         </Card>
 
@@ -182,10 +187,10 @@ export function Settings() {
             <hr className="divider" />
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <div>
-                <b className="small">Wipe entire database</b>
-                <div className="tiny muted">Start completely fresh. All modules cleared.</div>
+                <b className="small">Wipe everything</b>
+                <div className="tiny muted">Deletes your preparation data here and in your cloud account.</div>
               </div>
-              <button className="btn bad" onClick={() => setConfirmWipe(true)}>Wipe</button>
+              <button className="btn bad" disabled={wiping} onClick={() => setConfirmWipe(true)}>{wiping ? 'Wiping…' : 'Wipe'}</button>
             </div>
           </div>
         </Card>
@@ -201,8 +206,10 @@ export function Settings() {
       />
       <Confirm open={confirmReset} onClose={() => setConfirmReset(false)} onConfirm={() => { resetProgressOnly(); push('Study progress reset'); }}
         title="Reset study progress?" body="All topic statuses, notes and revision history will be cleared. Tasks, tests and other modules are kept." confirmLabel="Reset progress" />
-      <Confirm open={confirmWipe} onClose={() => setConfirmWipe(false)} onConfirm={() => { replaceDb(newDatabase()); push('Database wiped — fresh start'); }}
-        title="Wipe entire database?" body="Every module — tasks, tests, progress, tracker data — will be permanently deleted from this device." confirmLabel="Wipe everything" />
+      <Confirm open={confirmWipe} onClose={() => setConfirmWipe(false)} onConfirm={doWipe}
+        title="Wipe everything?"
+        body="Every module — tasks, tests, progress, focus sessions, lectures, current affairs and answers — is permanently deleted from this device and from your cloud account. Your sign-in is kept."
+        confirmLabel="Wipe everything" />
     </>
   );
 }

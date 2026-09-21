@@ -1,6 +1,6 @@
 // Extracts the operational syllabus embedded in the reference MyUPSCPlanner bundles
 // (reference/.../syllabusLoader-*.js) and merges it with the authored Geography Optional
-// syllabus to produce src/data/syllabus.json — the seed data for My UPSC Prep.
+// syllabus to produce src/data/syllabus.json — the seed data for PREPTRACK.
 //
 // Nothing inside /reference is modified. Run: node scripts/extract-reference-syllabus.mjs
 import fs from 'node:fs';
