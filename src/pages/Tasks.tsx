@@ -90,25 +90,12 @@ export function Tasks() {
 
       <div className="grid planner-layout">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* quick add */}
-          <Card className="card-pad planner-quick-add">
-            <div className="quick-add-heading">
-              <div><b>Quick Add</b><span>One task per line</span></div>
-              <span className="kbd">Ctrl ↵</span>
-            </div>
-            <div className="quick-add-input">
-              <textarea className="input" rows={3} placeholder={`Add one or several tasks for ${formatDateLong(date)}…`} value={quick} onChange={(e) => setQuick(e.target.value)}
-                onKeyDown={(e) => {
-                  const submitShortcut = e.key === 'Enter' && (e.ctrlKey || e.metaKey || (!e.shiftKey && !quick.includes('\n')));
-                  if (submitShortcut) { e.preventDefault(); addQuick(); }
-                }} />
-              <button className="btn primary" onClick={addQuick}>Add {parseQuickTasks(quick).length > 1 ? `${parseQuickTasks(quick).length} tasks` : 'task'}</button>
-            </div>
-            <div className="row wrap" style={{ marginTop: 10, gap: 6 }}>
-              <span className="tiny muted">Templates:</span>
-              {['📰 Newspaper + notes (60m)', '✍️ 2 answers (45m)', '↻ Revision hour (60m)', '🧮 CSAT practice (45m)', '🗺 Map practice (20m)'].map((tpl) => (
-                <button key={tpl} className="chip click" onClick={() => addTask({ name: tpl.replace(/^[^ ]+ /, ''), deadline: date, subjectMapping: guessMapping(tpl), estimateMin: Number(tpl.match(/\((\d+)m\)/)?.[1] ?? 0) || null })}>{tpl}</button>
-              ))}
+          {/* task list — the planner's top priority */}
+          <Card>
+            <div className="card-head"><h3>☰ My Task</h3><span className="hint">{anytime.length} pending</span></div>
+            <div className="card-pad" style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {anytime.length === 0 && <Empty icon="✓" title="No pending tasks" hint="Enjoy the calm — or plan ahead" />}
+              {anytime.map((t) => <TaskRow key={t.id} t={t} onToggle={() => toggleDone(t)} onEdit={() => setEditing(t)} onDelete={() => setDeleting(t)} />)}
             </div>
           </Card>
 
@@ -134,14 +121,6 @@ export function Tasks() {
             </Card>
           )}
 
-          <Card>
-            <div className="card-head"><h3>☰ Anytime</h3><span className="hint">{anytime.length} pending</span></div>
-            <div className="card-pad" style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {anytime.length === 0 && <Empty icon="✓" title="No pending tasks" hint="Enjoy the calm — or plan ahead" />}
-              {anytime.map((t) => <TaskRow key={t.id} t={t} onToggle={() => toggleDone(t)} onEdit={() => setEditing(t)} onDelete={() => setDeleting(t)} />)}
-            </div>
-          </Card>
-
           {done.length > 0 && (
             <Card>
               <div className="card-head"><h3>✓ Completed</h3><span className="hint">{done.length} done</span></div>
@@ -153,6 +132,28 @@ export function Tasks() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* quick add */}
+          <Card className="card-pad planner-quick-add">
+            <div className="quick-add-heading">
+              <div><b>Quick Add</b><span>One task per line</span></div>
+              <span className="kbd">Ctrl ↵</span>
+            </div>
+            <div className="quick-add-input">
+              <textarea className="input" rows={3} placeholder={`Add one or several tasks for ${formatDateLong(date)}…`} value={quick} onChange={(e) => setQuick(e.target.value)}
+                onKeyDown={(e) => {
+                  const submitShortcut = e.key === 'Enter' && (e.ctrlKey || e.metaKey || (!e.shiftKey && !quick.includes('\n')));
+                  if (submitShortcut) { e.preventDefault(); addQuick(); }
+                }} />
+              <button className="btn primary" onClick={addQuick}>Add {parseQuickTasks(quick).length > 1 ? `${parseQuickTasks(quick).length} tasks` : 'task'}</button>
+            </div>
+            <div className="row wrap" style={{ marginTop: 10, gap: 6 }}>
+              <span className="tiny muted">Templates:</span>
+              {['📰 Newspaper + notes (60m)', '✍️ 2 answers (45m)', '↻ Revision hour (60m)', '🧮 CSAT practice (45m)', '🗺 Map practice (20m)'].map((tpl) => (
+                <button key={tpl} className="chip click" onClick={() => addTask({ name: tpl.replace(/^[^ ]+ /, ''), deadline: date, subjectMapping: guessMapping(tpl), estimateMin: Number(tpl.match(/\((\d+)m\)/)?.[1] ?? 0) || null })}>{tpl}</button>
+              ))}
+            </div>
+          </Card>
+
           <Card>
             <div className="card-head"><h3>◎ Day summary</h3></div>
             <div className="card-pad" style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 9 }}>

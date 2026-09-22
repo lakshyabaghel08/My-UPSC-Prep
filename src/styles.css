@@ -651,7 +651,7 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
 /* Daily Planner */
 .planner-head { padding: 3px 0 2px; }.planner-week-strip { display: grid; grid-template-columns: repeat(7, minmax(74px,1fr)); gap: 8px; margin-bottom: 16px; overflow-x: auto; padding: 2px; }
 .planner-day { min-width: 76px; padding: 9px 10px; cursor: pointer; text-align: center; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 13px; }.planner-day:hover { border-color: var(--line-strong); }.planner-day.selected { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }.planner-day.today:not(.selected) { border-color: var(--line-strong); }
-.planner-layout { grid-template-columns: minmax(0,1.65fr) minmax(260px,.78fr); gap: 16px; }
+.planner-layout { grid-template-columns: minmax(0,1.55fr) minmax(320px,.9fr); gap: 16px; }
 .planner-quick-add { border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); background: linear-gradient(120deg, color-mix(in srgb, var(--accent-soft) 38%, var(--surface)), var(--surface)); }
 .quick-add-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }.quick-add-heading > div { display: flex; align-items: baseline; gap: 8px; }.quick-add-heading b { font-size: 15px; }.quick-add-heading span { color: var(--text-faint); font-size: 12px; }
 .quick-add-input { display: grid; grid-template-columns: 1fr auto; gap: 9px; align-items: stretch; }.quick-add-input textarea { resize: vertical; min-height: 72px; line-height: 1.45; }.quick-add-input .btn { align-self: end; min-height: 38px; }
