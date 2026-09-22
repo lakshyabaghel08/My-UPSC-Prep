@@ -201,7 +201,7 @@ check('multiline Quick Add writes exactly four separate tasks', storeRef.db.task
 // progress + revision flow
 const { syllabus } = mod;
 const someSub = syllabus.subtopics[0];
-check('syllabus indexed', syllabus.subtopics.length === 1000 && syllabus.papers.length === 9);
+check('syllabus indexed', syllabus.subtopics.length === 1085 && syllabus.papers.length === 9);
 await act(async () => { storeRef.setItemStatus(someSub.id, 'subtopic', 'completed'); });
 check('status stored', storeRef.db.progress[someSub.id]?.status === 'completed');
 await act(async () => { storeRef.reviseItem(someSub.id, 'subtopic', 2); });
