@@ -3,6 +3,10 @@
 // Paper 2: Geography of India
 // Structure mirrors the shared Schema: paper -> subjects -> chapters -> topics -> subtopics.
 // Authored for PREPTRACK; informed by the official UPSC Geography optional syllabus.
+//
+// Weightage note: the numbers here are authored relative weights (chapter totals sum to
+// their subject, topic totals sum to their chapter). The extraction pipeline rebalances
+// them proportionally so subject totals sum exactly to the paper weightage (50 each).
 
 export const geographyOptional = {
   papers: [
@@ -617,6 +621,184 @@ export const geographyOptional = {
                     { title: 'Electoral & Geopolitics', description: 'Electoral geography, geopolitics of resources, contemporary geopolitical conflicts' },
                     { title: 'Social & Cultural Geography Issues', description: 'Language & religion distribution, ethnic enclaves, urban social problems, gender geography' },
                     { title: 'Contemporary Themes', description: 'Sustainable development geography, environmental justice, digital divide, pandemic geography' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Regional Planning',
+          description: 'Growth pole theory, growth centres, planning for backward/hill/tribal areas, sustainable development & environmental planning',
+          weightage: 6.5,
+          chapters: [
+            {
+              title: 'Growth Theories, Growth Centres & Regional Imbalance',
+              description: 'Growth pole theory & growth centres; problems of regional imbalance',
+              weightage: 2.5,
+              topics: [
+                {
+                  title: 'Growth Pole Theory & Growth Centres',
+                  description: 'Theoretical foundations of growth-focused regional development',
+                  weightage: 1.3,
+                  subtopics: [
+                    { title: 'Growth Pole Theory', description: 'Perroux’s growth poles, propulsive industries, polarization & spread effects' },
+                    { title: 'Growth Centres & Growth Corridors', description: 'Types & hierarchy of growth centres, growth corridors & development axes' },
+                    { title: 'Trickle-Down & Backwash Effects', description: 'Myrdal’s backwash & spread, Hirschman’s trickle-down, cumulative causation' },
+                  ],
+                },
+                {
+                  title: 'Problems of Regional Imbalance & Planning',
+                  description: 'Concepts, indicators and approaches to regional planning',
+                  weightage: 1.2,
+                  subtopics: [
+                    { title: 'Concepts & Objectives of Regional Planning', description: 'Planning regions (nodal, homogeneous), objectives & types of regional planning' },
+                    { title: 'Regional Imbalance — Indicators & Patterns', description: 'Regional disparities, per-capita indicators, core–periphery contrasts' },
+                    { title: 'Approaches to Regional Planning', description: 'Top-down & bottom-up planning, regionalization for planning, decentralised planning' },
+                  ],
+                },
+              ],
+            },
+            {
+              title: 'Area-Specific & Environmental Planning',
+              description: 'Planning for backward, hill & tribal areas; sustainable development & environmental planning',
+              weightage: 2,
+              topics: [
+                {
+                  title: 'Planning for Backward, Hill & Tribal Areas',
+                  description: 'Targeted planning for disadvantaged regions',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Backward Area Planning & Programmes', description: 'Identification of backward areas, BPDP, backward region grants, outcomes' },
+                    { title: 'Hill & Mountain Area Development', description: 'Fragile ecosystems, hill area development programmes, infrastructure constraints' },
+                    { title: 'Tribal Area Development', description: 'Tribal sub-plans, PESA, livelihoods & forest rights, displacement issues' },
+                    { title: 'Drought-Prone & Desert Area Planning', description: 'DPAP, watershed development, water harvesting & desertification control' },
+                  ],
+                },
+                {
+                  title: 'Sustainable Development & Environmental Planning',
+                  description: 'Sustainability-led planning frameworks',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Concept of Sustainable Development', description: 'Brundtland definition, SDGs, carrying capacity & green growth' },
+                    { title: 'Environmental Planning & Impact Assessment', description: 'EIA process, environmental zoning, pollution & land-use planning' },
+                    { title: 'Settlement Planning & Growth Centres', description: 'Settlement hierarchies, service provision thresholds, growth-centre based settlement planning' },
+                  ],
+                },
+              ],
+            },
+            {
+              title: 'Regional Planning in Practice',
+              description: 'Institutions, policies and contemporary issues of regional development',
+              weightage: 2,
+              topics: [
+                {
+                  title: 'Institutions & Policy Instruments',
+                  description: 'Machinery and policies for regional development',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Regional Planning Institutions', description: 'Planning Commission era to NITI Aayog, regional boards & councils' },
+                    { title: 'Government Policies for Regional Development', description: 'Industrial location policy, incentive regimes, aspirational districts' },
+                    { title: 'Development Corridors & Industrial Regions', description: 'Industrial corridors, DMIC-style development nodes, SEZs & clusters' },
+                  ],
+                },
+                {
+                  title: 'Contemporary Issues in Regional Planning',
+                  description: 'Emerging challenges in regional planning',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Urban–Rural Disparities & Migration', description: 'Rural–urban migration, regional divergence, metropolitan growth pressures' },
+                    { title: 'Special Economic Zones & Regional Impacts', description: 'SEZ performance, land controversies, regional spread effects' },
+                    { title: 'Climate-Resilient Regional Planning', description: 'Climate vulnerability mapping, adaptation planning, disaster-resilient regions' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Models, Theories & Laws in Human Geography',
+          description: 'System analysis; Malthusian, Marxian & demographic transition theories; central place theory; gravity model; core–periphery; laws in geography',
+          weightage: 6.5,
+          chapters: [
+            {
+              title: 'Population & Development Theories',
+              description: 'Malthusian, Marxian and demographic transition theories',
+              weightage: 2,
+              topics: [
+                {
+                  title: 'Malthusian & Marxian Theories',
+                  description: 'Classical population theories and critiques',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Malthusian Theory of Population', description: 'Positive & preventive checks, arithmetic vs geometric growth, critiques & relevance' },
+                    { title: 'Marxian Perspective on Population', description: 'Surplus population & modes of production, Marxist critique of Malthus' },
+                    { title: 'Population–Resources Debate', description: 'Overpopulation vs resource optimists, carrying capacity, demographic dividend' },
+                  ],
+                },
+                {
+                  title: 'Demographic Transition Theory',
+                  description: 'Stages and applicability of the transition model',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Stages of Demographic Transition', description: 'Five-stage model, fertility & mortality dynamics, population momentum' },
+                    { title: 'Applicability to the Developing World', description: 'Euro-centric assumptions, stalled transitions, regional variations' },
+                    { title: 'Critiques & Extensions', description: 'Second demographic transition, policy influences, limits of the model' },
+                  ],
+                },
+              ],
+            },
+            {
+              title: 'Spatial Organization Theories & Models',
+              description: 'Central place theory, primate city, rank-size rule, gravity model & core–periphery',
+              weightage: 2.5,
+              topics: [
+                {
+                  title: 'Central Place Theory & City Systems',
+                  description: 'Settlement hierarchy and spatial organization models',
+                  weightage: 1.3,
+                  subtopics: [
+                    { title: 'Christaller’s Central Place Theory', description: 'Threshold & range, K=3/4/7 principles, hexagonal hinterlands' },
+                    { title: 'Lösch’s Central Place Model', description: 'Demand-based formulation, Löschian landscapes, comparison with Christaller' },
+                    { title: 'Primate City & Rank-Size Rule', description: 'Jefferson’s primate city, Zipf’s rank-size rule, deviations & explanations' },
+                    { title: 'Applicability & Critiques', description: 'Empirical tests, behavioural & institutional critiques, modern relevance' },
+                  ],
+                },
+                {
+                  title: 'Gravity Model, Distance Decay & Core–Periphery',
+                  description: 'Spatial interaction and regional polarization models',
+                  weightage: 1.2,
+                  subtopics: [
+                    { title: 'Gravity Model & its Applicability', description: 'Reilly’s law, model calibration, migration & trade flow applications' },
+                    { title: 'Distance Decay Concept', description: 'Decay functions, friction of distance, transport & communication effects' },
+                    { title: 'Core–Periphery Concept', description: 'Friedmann’s core–periphery, polarisation & diffusion, global & national examples' },
+                  ],
+                },
+              ],
+            },
+            {
+              title: 'Quantitative Revolution & Laws in Geography',
+              description: 'System analysis, quantitative revolution and law-making in human geography',
+              weightage: 2,
+              topics: [
+                {
+                  title: 'System Analysis in Human Geography',
+                  description: 'Systems thinking applied to human-geographic phenomena',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Systems Approach in Geography', description: 'Open & closed systems, inputs–outputs, feedback & equilibrium' },
+                    { title: 'Structure, Function & Process', description: 'System morphology, cascading systems, process-response analysis' },
+                    { title: 'Applications of System Analysis', description: 'Urban & regional systems, transport networks, modelling human-environment systems' },
+                  ],
+                },
+                {
+                  title: 'Quantitative Revolution & Laws in Geography',
+                  description: 'Theoretical geography, model-building and laws',
+                  weightage: 1,
+                  subtopics: [
+                    { title: 'Quantitative Revolution & Theoretical Geography', description: 'Schaefer vs Hartshorne, models/statistics turn, nomothetic geography' },
+                    { title: 'Models & Model-Building', description: 'Types of models, abstraction & validation, critiques of modelling' },
+                    { title: 'Laws in Geography', description: 'Spatial laws & regularities (e.g., Tobler’s first law), status of law-making in geography' },
                   ],
                 },
               ],

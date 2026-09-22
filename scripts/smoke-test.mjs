@@ -118,6 +118,12 @@ try {
   console.log(hasData ? '  ✓ syllabus data embedded in bundle' : '  ✗ syllabus data missing from bundle');
   if (!hasData) failed++;
 
+  // Updated operational syllabus sections must be part of the shipped seed:
+  const hasUpdates = bundleSrc.includes('Social Justice') && bundleSrc.includes('Internal Security')
+    && bundleSrc.includes('Regional Planning') && bundleSrc.includes('Models, Theories & Laws in Human Geography');
+  console.log(hasUpdates ? '  ✓ updated operational syllabus sections embedded (Social Justice, Internal Security, Regional Planning, Models/Theories)' : '  ✗ updated syllabus sections missing from bundle');
+  if (!hasUpdates) failed++;
+
   const realErrors = errors.filter(([, m]) => !m.includes('Not implemented: window.matchMedia') && !m.includes('scrollTo'));
   if (realErrors.length) {
     failed++;

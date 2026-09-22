@@ -13,7 +13,7 @@ preparation follows you across devices and stays visible only to you.
 | Module | What it does |
 | --- | --- |
 | **Dashboard** | Action-first command centre with today's plan, Geography Optional position, study graphs and analytics |
-| **Operational Syllabus** | Paper → Subject → Chapter → Topic → Subtopic tree (9 papers, 37 subjects, 88 chapters, 257 topics, **1000 subtopics**) with cascading completion, short notes, revision logging and task planning |
+| **Operational Syllabus** | Paper → Subject → Chapter → Topic → Subtopic tree (9 papers, 42 subjects, 103 chapters, 287 topics, **1085 subtopics**) with cascading completion, short notes, revision logging and task planning |
 | **Daily Planner** | Time blocks, multiline quick-add + templates, overdue carry-forward, week strip, syllabus-linked tasks |
 | **Calendar** | Month grid of tasks, events, revision dues and tests |
 | **Geography Lecture Tracker** | Inclusive lecture ranges with expandable one-click completion and preserved series progress |
@@ -127,8 +127,11 @@ npm run generate:syllabus   # regenerates src/data/syllabus.json
 ```
 
 - `scripts/extract-reference-syllabus.mjs` — reads the reference bundles, extracts the
-  Prelims (GS1 + CSAT) and Mains (Essay, GS1–GS4) hierarchies with weightages, and merges the
-  authored Geography Optional operational syllabus (`scripts/data/geographyOptional.mjs`).
+  Prelims (GS1 + CSAT) and Mains (Essay, GS1–GS4) hierarchies with weightages, merges the
+  authored Geography Optional operational syllabus (`scripts/data/geographyOptional.mjs`)
+  and the authored mains subject updates (`scripts/data/syllabusUpdates.mjs` — GS1
+  Geography, GS2 Social Justice, GS3 Internal Security), then rebalances weightages so
+  children sum exactly to their parent at every level.
 - Re-runnable and deterministic; the output is committed at `src/data/syllabus.json`.
 
 ## Architecture
@@ -151,6 +154,8 @@ scripts/
   verify-migration.mjs    # offline migration verifier (embedded Postgres)
   extract-reference-syllabus.mjs
   data/geographyOptional.mjs
+  data/syllabusUpdates.mjs
+  syllabus-consistency-test.mjs
   logic-test.mjs / smoke-test.mjs / test-entry.ts
 public/                   # PWA: manifest, icons, service worker
 reference/                # original downloaded assets (read-only, never modified)
