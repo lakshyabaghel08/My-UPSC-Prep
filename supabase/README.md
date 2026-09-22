@@ -25,13 +25,21 @@ available — by design, so nothing half-configured ever ships.
 
 ## Applying the migration to your Supabase project
 
-**Option 1 — Dashboard (2 minutes):**
+**Option 1 — Automatic (recommended):** the GitHub Actions workflow
+`.github/workflows/supabase-migrate.yml` re-applies every file in
+`supabase/migrations/` whenever a migration (or the workflow itself) lands on
+`main`, and can also be run by hand (Actions → **Supabase migrations** → Run
+workflow). It needs the `SUPABASE_ACCESS_TOKEN` repository secret. Migration
+files must stay idempotent (`create table if not exists`, `add column if not
+exists`, …) because the workflow always runs the whole folder.
+
+**Option 2 — Dashboard (2 minutes):**
 1. Create a project at supabase.com (suggested name: `preptrack`, region `ap-south-1 (Mumbai)`).
 2. SQL Editor → New query → run the files in `supabase/migrations/` in numeric order. Existing projects can safely run only `0002_lecture_ranges.sql`.
 3. Project Settings → API: copy the **Project URL** and the **anon/public
    publishable key** (browser-safe — never the service_role key).
 
-**Option 2 — Supabase CLI:**
+**Option 3 — Supabase CLI:**
 ```bash
 supabase link --project-ref <your-project-ref>
 supabase db push
