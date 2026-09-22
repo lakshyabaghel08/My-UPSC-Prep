@@ -1,0 +1,48 @@
+name: Supabase migrations
+
+# Applies supabase/migrations/*.sql to the LIVE Supabase project.
+#
+# Migration files MUST be idempotent (they all are today: `create table if
+# exists`, `add column if not exists`, `drop policy if exists`, …) because
+# this workflow re-runs the whole folder, never a diff.
+#
+# Triggers:
+#   - manually: Actions → "Supabase migrations" → Run workflow
+#   - automatically whenever migrations (or this workflow) land on main —
+#     so a schema change can never ship to the app without reaching the
+#     database again (the cause of "Could not find the 'completed_lectures'
+#     column of 'lectures' in the schema cache" sync errors).
+#
+# Requires repository secret: SUPABASE_ACCESS_TOKEN (Supabase dashboard →
+# Account → Access tokens). Without it the job fails fast with instructions.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/supabase-migrate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply migrations + verify RLS
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # This job only migrates the schema — no git writes, no e2e suite
+          # (run "Supabase operations" → e2e-tests for the full live check).
+          SKIP_ENV_PUSH: '1'
+          SKIP_E2E: '1'
+        run: node scripts/bootstrap-supabase.mjs

@@ -7,7 +7,7 @@ import { Bar, Card, CardHead, Empty, RChip } from '../ui/components';
 import { ColumnsChart, Donut, HBars, LineChart } from '../ui/charts';
 import { formatDate, fmtDuration, greetingFor, relDay, todayKey, WEEKDAY_LABELS } from '../lib/date';
 import { itemTitle, syllabus } from '../data/syllabus';
-import { lectureProgress } from '../lib/lectures';
+import { lectureProgress, lectureSeriesLabel } from '../lib/lectures';
 import { daysUntilExam, examDatesFor } from '../config/exams';
 
 export function Dashboard() {
@@ -116,8 +116,8 @@ export function Dashboard() {
             <div>
               <span className="tiny muted">CURRENT LECTURE POSITION</span>
               {activeLecture && activeLectureProgress ? (
-                <><strong>{activeLecture.title}</strong><p>Lecture {activeLectureProgress.next ?? activeLecture.rangeEnd} · {activeLectureProgress.count}/{activeLectureProgress.total} complete</p></>
-              ) : <><strong>No active series</strong><p>Add an inclusive lecture range to begin.</p></>}
+                <><strong>{activeLecture.subject}</strong><p>{lectureSeriesLabel(activeLecture)} · next Lecture {activeLectureProgress.next ?? activeLecture.rangeEnd} · {activeLectureProgress.count}/{activeLectureProgress.total} complete</p></>
+              ) : <><strong>No active series</strong><p>Add a subject and inclusive lecture range to begin.</p></>}
             </div>
             <div>
               <span className="tiny muted">LECTURE COVERAGE</span>

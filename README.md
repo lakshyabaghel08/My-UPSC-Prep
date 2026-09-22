@@ -50,7 +50,7 @@ node scripts/auth-gate-test.mjs   # build first — asserts the auth gate hides 
 node scripts/verify-migration.mjs # embedded Postgres: applies the SQL migration, 27 RLS/schema checks
 ```
 
-Live cloud suite (35 checks: auth incl. remember-me session semantics, CRUD, RLS isolation
+Live cloud suite (36 checks: auth incl. remember-me session semantics, CRUD, RLS isolation
 between two real users, bulk migration):
 
 ```bash

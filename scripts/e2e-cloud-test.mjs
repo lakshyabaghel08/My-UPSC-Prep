@@ -136,8 +136,17 @@ async function main() {
   check('8. edit task', edit.data?.name === 'Read Laxmikanth Ch.1 + notes');
 
   // ---------- 4. geography lectures ----------
-  const lec = await sbA.from('lectures').insert({ user_id: uidA, title: 'Plate Tectonics L1', subject: 'Geomorphology', total_lectures: 12, lecture_no: 4, pdf_followed: 'booklet ch3', short_notes_made: true, revised: true, revision_count: 1, pyqs_attempted: 3, status: 'completed' }).select('id').single();
+  // The insert deliberately includes the 0002_lecture_ranges.sql columns
+  // (range_start/range_end/completed_lectures): if the live database is
+  // missing that migration, this fails exactly like the app's sync queue
+  // ("Could not find the 'completed_lectures' column … in the schema cache").
+  const lec = await sbA.from('lectures').insert({ user_id: uidA, title: 'Plate Tectonics L1', subject: 'Geomorphology', total_lectures: 12, lecture_no: 4, range_start: 1, range_end: 12, completed_lectures: [1, 2, 3, 4], pdf_followed: 'booklet ch3', short_notes_made: true, revised: true, revision_count: 1, pyqs_attempted: 3, status: 'completed' }).select('id').single();
   check('9. geography lecture progress record', Boolean(lec.data?.id), lec.error?.message);
+  const lecRead = lec.data?.id ? await sbA.from('lectures').select('range_start, range_end, completed_lectures').eq('id', lec.data.id).single() : { data: null, error: { message: 'no lecture id' } };
+  const doneNumbers = Array.isArray(lecRead.data?.completed_lectures) ? [...lecRead.data.completed_lectures].map(Number).sort((a, b) => a - b) : [];
+  check('9b. lecture ranges round-trip (migration 0002 columns)',
+    lecRead.data?.range_start === 1 && lecRead.data?.range_end === 12 && JSON.stringify(doneNumbers) === JSON.stringify([1, 2, 3, 4]),
+    lecRead.error?.message);
 
   // ---------- 5. revision (R1-R5) ----------
   const itemId = 'p:prelims-gs1:s0:history:c0:ancient-india:t0:prehistoric-cultures:st0:paleolithic-age';

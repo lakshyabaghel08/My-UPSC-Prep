@@ -80,7 +80,7 @@ export interface StoreValue {
    *  because Study Hours / Analytics are derived from them. */
   pruneStaleSessions: () => void;
   // lectures
-  addLecture: (l: Partial<Lecture> & { title: string; subject: string }) => void;
+  addLecture: (l: Partial<Lecture> & { subject: string }) => void;
   updateLecture: (id: string, patch: Partial<Lecture>) => void;
   deleteLecture: (id: string) => void;
   // current affairs
@@ -223,14 +223,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try { await run(); pendingOps.current.delete(key); }
       catch (e) { setSyncStatus((s) => ({ ...s, lastError: e instanceof Error ? e.message : String(e) })); }
     }
-    setSyncStatus((s) => ({ ...s, pending: pendingOps.current.size, syncing: false, lastError: pendingOps.current.size ? s.lastError : null, lastSyncAt: new Date().toISOString() }));
+    // Only claim a clean bill of health when nothing is still queued —
+    // progress upserts that failed live in `progressDirty`, not `pendingOps`.
+    const remaining = pendingOps.current.size + progressDirty.current.size;
+    setSyncStatus((s) => ({ ...s, pending: pendingOps.current.size, syncing: false, lastError: remaining ? s.lastError : null, lastSyncAt: new Date().toISOString() }));
   }, [repo, flushProgressNow]);
 
   // retry: on network back + periodically when items are pending
   useEffect(() => {
     const onOnline = () => { void flushSync(); };
     window.addEventListener('online', onOnline);
-    const t = window.setInterval(() => { if (pendingOps.current.size > 0) void flushSync(); }, 60000);
+    const t = window.setInterval(() => {
+      if (pendingOps.current.size > 0 || progressDirty.current.size > 0) void flushSync();
+    }, 60000);
     return () => { window.removeEventListener('online', onOnline); window.clearInterval(t); };
   }, [flushSync]);
 
@@ -433,9 +438,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [push, applyIdMap]);
 
   // ---------------------------------------------------------------- lectures
-  const addLecture = useCallback((l: Partial<Lecture> & { title: string; subject: string }) => {
+  const addLecture = useCallback((l: Partial<Lecture> & { subject: string }) => {
     const lec = normalizeLectureProgress<Lecture>({
-      id: uid('lec'), title: l.title, subject: l.subject, chapter: l.chapter ?? '',
+      id: uid('lec'), title: l.title ?? l.subject, subject: l.subject, chapter: l.chapter ?? '',
       lectureNo: l.lectureNo ?? l.rangeStart ?? 1, totalLectures: l.totalLectures ?? 1,
       rangeStart: l.rangeStart ?? 1, rangeEnd: l.rangeEnd ?? (l.totalLectures ?? 1),
       completedLectures: l.completedLectures ?? [], source: l.source ?? '',

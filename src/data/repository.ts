@@ -233,6 +233,46 @@ export function lectureFromDb(r: Row, id: string): Lecture {
   };
 }
 
+/** Columns added by supabase/migrations/0002_lecture_ranges.sql. A database
+ * that predates that migration rejects any payload containing them
+ * ("Could not find the '…' column … in the schema cache") — which used to
+ * wedge the sync queue forever. When detected, lecture writes fall back to the
+ * legacy row shape: per-lecture completion is reconstructed client-side from
+ * lecture_no/status (see lib/lectures.ts) until the migration is applied. */
+const LECTURE_RANGE_COLUMNS = ['range_start', 'range_end', 'completed_lectures'] as const;
+let lectureRangeColumnsMissing = false;
+
+function isSchemaCacheError(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+  return /Could not find the '[^']+' column/.test(message);
+}
+
+function lectureRowLegacy(userId: string, l: Lecture): Row {
+  const row = lectureToDb(userId, l);
+  for (const column of LECTURE_RANGE_COLUMNS) delete row[column];
+  // The legacy schema has no range columns, so rebase the absolute lecture
+  // pointer (rangeStart-based) into 1-based series space. That keeps
+  // lecture_no/status reconstructing the same contiguous progress on pull
+  // (lib/lectures.ts) and in the 0002 server-side backfill, which reads
+  // lecture_no as "watched + 1" over generate_series(1, total_lectures).
+  const total = Math.max(1, Number(row.total_lectures) || 1);
+  const completed = new Set(l.completedLectures ?? []);
+  let done = 0;
+  while (done < total && completed.has(l.rangeStart + done)) done += 1;
+  row.lecture_no = Math.min(Math.max(1, done + 1), total);
+  return row;
+}
+
+function noteLegacyLectureSchema() {
+  if (lectureRangeColumnsMissing) return;
+  lectureRangeColumnsMissing = true;
+  console.warn(
+    "lectures: server schema predates migration 0002 (range_start/range_end/completed_lectures) — " +
+    'syncing lecture series in compatibility mode. Apply supabase/migrations/0002_lecture_ranges.sql ' +
+    'to the database to restore per-lecture range sync.',
+  );
+}
+
 // ---------------------------------------------------------------- current affairs
 export function caToDb(userId: string, c: CurrentAffairItem): Row {
   return {
@@ -370,7 +410,17 @@ export class Repository {
   async insertPyqsAndGetIds(pyqs: PYQ[]) { return this.insertReturningIds('pyqs', pyqs.map((p) => pyqToDb(this.userId, p))); }
   async insertPrelimsTestsAndGetIds(tests: PrelimsTest[]) { return this.insertReturningIds('prelims_tests', tests.map((t) => prelimsTestToDb(this.userId, t))); }
   async insertMainsTestsAndGetIds(tests: MainsTest[]) { return this.insertReturningIds('mains_tests', tests.map((t) => mainsTestToDb(this.userId, t))); }
-  async insertLecturesAndGetIds(lects: Lecture[]) { return this.insertReturningIds('lectures', lects.map((l) => lectureToDb(this.userId, l))); }
+  async insertLecturesAndGetIds(lects: Lecture[]) {
+    if (!lectureRangeColumnsMissing) {
+      try {
+        return await this.insertReturningIds('lectures', lects.map((l) => lectureToDb(this.userId, l)));
+      } catch (e) {
+        if (!isSchemaCacheError(e)) throw e;
+        noteLegacyLectureSchema();
+      }
+    }
+    return this.insertReturningIds('lectures', lects.map((l) => lectureRowLegacy(this.userId, l)));
+  }
   async insertCurrentAffairsAndGetIds(items: CurrentAffairItem[]) { return this.insertReturningIds('current_affairs', items.map((c) => caToDb(this.userId, c))); }
   async insertAnswersAndGetIds(items: AnswerEntry[]) { return this.insertReturningIds('answers', items.map((a) => answerToDb(this.userId, a))); }
   async insertHabitsAndGetIds(habits: Habit[]) { return this.insertReturningIds('habits', habits.map((h) => habitToDb(this.userId, h))); }
@@ -385,7 +435,13 @@ export class Repository {
     if (error) throw new Error(`${table}: ${error.message}`);
   }
   async updateLecture(id: string, l: Lecture) {
-    const { error } = await this.sb.from('lectures').update(lectureToDb(this.userId, l)).eq('id', id);
+    if (!lectureRangeColumnsMissing) {
+      const { error } = await this.sb.from('lectures').update(lectureToDb(this.userId, l)).eq('id', id);
+      if (!error) return;
+      if (!isSchemaCacheError(error.message)) throw new Error(`lectures: ${error.message}`);
+      noteLegacyLectureSchema();
+    }
+    const { error } = await this.sb.from('lectures').update(lectureRowLegacy(this.userId, l)).eq('id', id);
     if (error) throw new Error(`lectures: ${error.message}`);
   }
   async updateCurrentAffair(id: string, c: CurrentAffairItem) {

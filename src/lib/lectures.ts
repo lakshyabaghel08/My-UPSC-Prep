@@ -68,3 +68,9 @@ export function lectureProgress(lecture: Lecture) {
     next: numbers.find((number) => !completed.includes(number)) ?? null,
   };
 }
+
+/** Display label for a series. The subject is the series name — the old
+ * free-text title field was redundant with it and has been removed. */
+export function lectureSeriesLabel(lecture: Lecture): string {
+  return `Lectures ${lecture.rangeStart}–${lecture.rangeEnd}`;
+}

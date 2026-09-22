@@ -6,7 +6,7 @@ import { useToast } from '../ui/toast';
 import { lectureSummary } from '../store/selectors';
 import { syllabus } from '../data/syllabus';
 import type { Lecture } from '../types';
-import { completedLectureNumbers, lectureProgress, parseLectureRange } from '../lib/lectures';
+import { completedLectureNumbers, lectureProgress, lectureSeriesLabel, parseLectureRange } from '../lib/lectures';
 
 export function Lectures() {
   const { db, updateLecture, deleteLecture } = useStore();
@@ -31,13 +31,19 @@ export function Lectures() {
       list.push(lecture);
       grouped.set(lecture.subject, list);
     }
+    // First-added series stay at the top: creation order, not range/subject
+    // alphabetical (which let a freshly created series jump above older ones).
+    const byFirstAdded = (a: Lecture, b: Lecture) =>
+      (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
+      || a.rangeStart - b.rangeStart
+      || a.id.localeCompare(b.id);
     return [...grouped.entries()]
-      .map(([subject, list]) => ({
-        subject,
-        list: list.sort((a, b) => a.rangeStart - b.rangeStart || a.title.localeCompare(b.title)),
-      }))
+      .map(([subject, raw]) => {
+        const list = [...raw].sort(byFirstAdded);
+        return { subject, list, createdAt: list[0].createdAt ?? '' };
+      })
       .filter((group) => filterSubject === 'all' || group.subject === filterSubject)
-      .sort((a, b) => a.subject.localeCompare(b.subject));
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.subject.localeCompare(b.subject));
   }, [db.lectures, filterSubject]);
 
   const toggleExpanded = (id: string) => setExpanded((current) => {
@@ -83,7 +89,7 @@ export function Lectures() {
       </div>
 
       {db.lectures.length === 0 ? (
-        <Card><Empty icon="▶" title="No lecture series yet" hint="Add a title, subject and inclusive range such as 98-113."
+        <Card><Empty icon="▶" title="No lecture series yet" hint="Add a subject and inclusive range such as 98-113."
           action={<button className="btn primary" onClick={() => setShowAdd(true)}>+ Add your first series</button>} /></Card>
       ) : (
         <>
@@ -116,17 +122,15 @@ export function Lectures() {
                       return (
                         <article key={series.id} className={`lecture-series ${open ? 'open' : ''}`}>
                           <div className="lecture-series-row">
-                            <button className="lecture-expand" onClick={() => toggleExpanded(series.id)} aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${series.title}`}>›</button>
+                            <button className="lecture-expand" onClick={() => toggleExpanded(series.id)} aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${series.subject} ${lectureSeriesLabel(series)}`}>›</button>
                             <button className="lecture-series-main" onClick={() => toggleExpanded(series.id)}>
-                              <span className="lecture-series-title">{series.title}</span>
+                              <span className="lecture-series-title">{lectureSeriesLabel(series)}</span>
                               <span className="lecture-series-meta">
-                                {series.rangeStart}–{series.rangeEnd} · {progress.count}/{progress.total} completed · {progress.pct}%
+                                {progress.count}/{progress.total} completed · {progress.pct}%
                                 {progress.next != null && <strong> · Next: Lecture {progress.next}</strong>}
                               </span>
-                              {series.chapter && <span className="tiny muted">{series.chapter}</span>}
                             </button>
                             <div className="lecture-series-bar"><Bar value={progress.pct} tone="geo" /></div>
-                            {series.notesLink && <a className="btn sm ghost" href={series.notesLink} target="_blank" rel="noreferrer">Notes ↗</a>}
                             <button className="icon-btn" title="Edit series" onClick={() => setEditing(series)}>✎</button>
                             <button className="icon-btn" title="Delete series" onClick={() => setDeleting(series)}>🗑</button>
                           </div>
@@ -156,7 +160,7 @@ export function Lectures() {
 
       <LectureForm key={showAdd ? 'add-open' : 'add-closed'} open={showAdd} onClose={() => setShowAdd(false)} subjects={geoSubjects} />
       {editing && <LectureForm key={editing.id} open editing={editing} onClose={() => setEditing(null)} subjects={geoSubjects} />}
-      <Confirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={() => deleting && deleteLecture(deleting.id)} title="Delete lecture series?" body={`“${deleting?.title}” and its lecture completion will be removed.`} />
+      <Confirm open={!!deleting} onClose={() => setDeleting(null)} onConfirm={() => deleting && deleteLecture(deleting.id)} title="Delete lecture series?" body={`“${deleting ? `${deleting.subject} · ${lectureSeriesLabel(deleting)}` : ''}” and its lecture completion will be removed.`} />
     </>
   );
 }
@@ -165,22 +169,19 @@ function LectureForm({ open, onClose, editing, subjects }: { open: boolean; onCl
   const { addLecture, updateLecture } = useStore();
   const { push } = useToast();
   const saving = useRef(false);
-  const [title, setTitle] = useState(editing?.title ?? '');
   const [subject, setSubject] = useState(editing?.subject ?? subjects[0] ?? 'Geography Optional');
-  const [chapter, setChapter] = useState(editing?.chapter ?? '');
   const [range, setRange] = useState(editing ? `${editing.rangeStart}-${editing.rangeEnd}` : '');
-  const [notesLink, setNotesLink] = useState(editing?.notesLink ?? '');
   const parsed = parseLectureRange(range);
 
   const submit = () => {
     if (saving.current) return;
-    if (!title.trim()) { push('Series title is required', 'bad'); return; }
+    if (!subject.trim()) { push('Subject is required', 'bad'); return; }
     if (!parsed) { push('Enter a valid range such as 98-113 (end must be at least start)', 'bad'); return; }
     saving.current = true;
     const previousCompleted = editing ? completedLectureNumbers(editing) : [];
     const completedLectures = previousCompleted.filter((number) => parsed.numbers.includes(number));
     const payload = {
-      title: title.trim(), subject, chapter: chapter.trim(), notesLink: notesLink.trim(),
+      subject,
       rangeStart: parsed.start, rangeEnd: parsed.end, totalLectures: parsed.numbers.length,
       completedLectures,
       lectureNo: parsed.numbers.find((number) => !completedLectures.includes(number)) ?? parsed.end,
@@ -198,22 +199,19 @@ function LectureForm({ open, onClose, editing, subjects }: { open: boolean; onCl
         <button className="btn primary" onClick={submit}>{editing ? 'Save changes' : 'Create series'}</button>
       </>
     }>
-      <Field label="Series / lecture title"><input className="input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Biogeography" autoFocus /></Field>
       <div className="form-grid">
         <Field label="Subject">
-          <select className="input" value={subject} onChange={(event) => setSubject(event.target.value)}>
+          <select className="input" value={subject} onChange={(event) => setSubject(event.target.value)} autoFocus>
             {subjects.map((item) => <option key={item}>{item}</option>)}
             {!subjects.includes(subject) && <option>{subject}</option>}
           </select>
         </Field>
-        <Field label="Chapter (optional)"><input className="input" value={chapter} onChange={(event) => setChapter(event.target.value)} placeholder="e.g. Biogeography" /></Field>
         <Field label="Lecture range">
           <input className={`input ${range && !parsed ? 'invalid' : ''}`} value={range} onChange={(event) => setRange(event.target.value)} placeholder="98-113" inputMode="numeric" />
           <span className={`field-help ${range && !parsed ? 'bad-text' : ''}`}>
             {parsed ? `${parsed.start}–${parsed.end} · ${parsed.numbers.length} lectures will be generated` : 'Inclusive numeric range, for example 98-113'}
           </span>
         </Field>
-        <Field label="Short notes link (optional)"><input className="input" value={notesLink} onChange={(event) => setNotesLink(event.target.value)} placeholder="https://…" /></Field>
       </div>
     </Modal>
   );
