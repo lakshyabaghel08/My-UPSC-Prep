@@ -41,7 +41,7 @@ jobs:
           [ -n "$VITE_SUPABASE_URL" ] || VITE_SUPABASE_URL="$(sed -n 's/^VITE_SUPABASE_URL=//p' .env.production | head -n1)"
           [ -n "$VITE_SUPABASE_PUBLISHABLE_KEY" ] || VITE_SUPABASE_PUBLISHABLE_KEY="$(sed -n 's/^VITE_SUPABASE_PUBLISHABLE_KEY=//p' .env.production | head -n1)"
           export VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY
-          npm run build -- --base=/My-UPSC-Prep/
+          npm run build -- --base=/PREPTRACK/
         env:
           # Cloud sync config (publishable/browser-safe values only).
           # Secrets take precedence over the committed .env.production.
