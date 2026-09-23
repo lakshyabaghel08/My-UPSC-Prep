@@ -1,7 +1,8 @@
 /** Flip Clock — split top/bottom digit cards that physically flip.
  *
- * Ported from the reference implementation in `reference/witherwood/index`
- * (`FlipClock` class + `.flip-clock` styles): the same DOM structure
+ * Ported from the witherwood reference implementation (archived — the original
+ * bundle was removed from the repo) — its `FlipClock` class + `.flip-clock`
+ * styles: the same DOM structure
  * (`.flip-digit` > `.flip-half.top/.bottom` > `.val`, plus two transient
  * `.flip-flap` halves), the same layering and transform origins, the same
  * 300ms + 300ms staged rotateX sequence with `cubic-bezier(0.37, 0, 0.63, 1)`,
