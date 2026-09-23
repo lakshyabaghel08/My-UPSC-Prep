@@ -1,7 +1,6 @@
 /** Authentication screen — matches the existing PREPTRACK design system. */
 import React, { useState } from 'react';
 import { useStore } from '../store/store';
-import { Modal } from '../ui/components';
 import { isCloudConfigured } from '../lib/supabase';
 import { useToast } from '../ui/toast';
 
@@ -105,82 +104,11 @@ export function AuthPage() {
         <button className="btn block" onClick={continueLocal}>Continue on this device</button>
         {localRecords > 0 && (
           <p className="tiny muted" style={{ marginTop: 8, textAlign: 'center' }}>
-            {localRecords} local records found on this device — you can import them into your account after signing in.
+            {localRecords} local records found on this device — signing in to a new account syncs them up
+            automatically, once. Nothing is deleted, and nothing is ever uploaded twice.
           </p>
         )}
       </div>
     </div>
-  );
-}
-
-/** First-sign-in migration offer (Phase 6). Local data is never deleted. */
-export function MigrationModal() {
-  const { migrationPrompt, dismissMigrationPrompt, migrateLocalToCloud, db } = useStore();
-  const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<string>('');
-  const [pct, setPct] = useState(0);
-  const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null);
-
-  if (!migrationPrompt) return null;
-
-  const counts: [string, number][] = [
-    ['tasks', db.tasks.length],
-    ['syllabus progress', Object.keys(db.progress).length],
-    ['revision logs', db.revisionLogs.length],
-    ['tests', db.prelimsTests.length + db.mainsTests.length],
-    ['focus sessions', db.focusSessions.length],
-    ['Geo lectures', db.lectures.length],
-    ['current affairs', db.currentAffairs.length],
-    ['answers', db.answers.length],
-  ];
-  const total = counts.reduce((a, [, n]) => a + n, 0);
-
-  const run = async () => {
-    setBusy(true); setResult(null);
-    const res = await migrateLocalToCloud((msg, p) => { setStep(msg); setPct(p); });
-    setBusy(false);
-    setResult(res);
-  };
-
-  return (
-    <Modal open onClose={dismissMigrationPrompt} title="Import your local data?" footer={
-      result?.ok ? (
-        <button className="btn primary" onClick={dismissMigrationPrompt}>Done</button>
-      ) : (
-        <>
-          <button className="btn ghost" onClick={dismissMigrationPrompt} disabled={busy}>{result?.ok ? 'Close' : 'Not now'}</button>
-          {!result && <button className="btn primary" onClick={run} disabled={busy || total === 0}>{busy ? 'Importing…' : `Import ${total} records`}</button>}
-        </>
-      )
-    }>
-      {!result ? (
-        <>
-          <p className="small soft">
-            This device has <b style={{ color: 'var(--text)' }}>{total} local records</b>. Import them into your
-            account so they sync everywhere. This replaces any existing cloud data with this device's data
-            (safe re-run — no duplicates). <b>Your local copy is never deleted.</b>
-          </p>
-          <div className="row wrap" style={{ gap: 6 }}>
-            {counts.filter(([, n]) => n > 0).map(([label, n]) => <span key={label} className="chip">{label}: {n}</span>)}
-          </div>
-          {busy && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div className="bar geo"><div style={{ width: `${pct}%` }} /></div>
-              <span className="tiny muted">{step}</span>
-            </div>
-          )}
-        </>
-      ) : result.ok ? (
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ fontSize: 34 }}>✅</div>
-          <h2 style={{ margin: '6px 0' }}>Migration complete</h2>
-          <p className="small soft">{total} records are now synced to your account. Local data remains on this device as a backup.</p>
-        </div>
-      ) : (
-        <div className="small" style={{ color: 'var(--bad)', background: 'var(--bad-soft)', padding: '10px 14px', borderRadius: 10 }}>
-          Migration failed: {result.error}. Nothing was lost — your local data is intact. You can retry.
-        </div>
-      )}
-    </Modal>
   );
 }

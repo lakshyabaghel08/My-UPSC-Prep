@@ -47,6 +47,7 @@ Tests (no browser needed):
 ```bash
 npm test           # logic tests (data layer, revision engine) + jsdom smoke test of all 14 routes
 node scripts/auth-gate-test.mjs   # build first — asserts the auth gate hides data pre-sign-in
+node scripts/reimport-test.mjs  # regression: no import prompt, no duplicates on reopen
 node scripts/verify-migration.mjs # embedded Postgres: applies the SQL migration, 27 RLS/schema checks
 ```
 
@@ -76,8 +77,11 @@ Built on **Supabase** (Postgres + Auth + Row Level Security). Behavior:
 - **Local-first, optimistic** — every mutation saves locally *instantly*, then pushes to the cloud
   in the background. Offline or on failure, changes queue and retry (on reconnect + every 60 s);
   nothing is silently lost. A header chip shows live sync state.
-- **First sign-in migration** — the app offers a one-time import of existing local data (never
-  deletes it; safe to re-run; per-user completion flag).
+- **First sign-in import** — signing in on a device that already holds preparation data, into an
+  account that is still empty, uploads that data once in the background. It is strictly additive
+  (no cloud row is ever deleted or overwritten), it runs at most once per account/device, and
+  local data is never deleted. There is no prompt and no manual "re-import" action — repeating an
+  import is exactly what used to duplicate records, so it is not offered.
 - **Multi-device** — on sign-in the cloud is pulled and merged (union by id; local wins on
   conflicts; remote adopted when strictly further along).
 - **Isolation** — every table is `user_id`-scoped with RLS policies (`auth.uid()` only). Verified
@@ -139,7 +143,7 @@ npm run generate:syllabus   # regenerates src/data/syllabus.json
 ```
 src/
   data/syllabus.ts        # syllabus index: id maps, hierarchy paths, lookups
-  data/repository.ts      # THE cloud I/O layer: all 13 tables, snake_case mapping, bulk migration
+  data/repository.ts      # THE cloud I/O layer: all 13 tables, snake_case mapping, first-sign-in import
   lib/                    # date utils, R1–R5 revision engine, ids, supabase client singleton
   store/db.ts             # localStorage persistence, migration, backup/restore
   store/store.tsx         # React context store — mutations, optimistic cloud queue, auth flows

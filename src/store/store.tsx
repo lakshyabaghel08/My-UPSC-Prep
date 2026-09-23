@@ -6,8 +6,10 @@
  *    repository (`src/data/repository.ts`); failures queue for retry (online
  *    event / interval) — no silent data loss.
  *  - On sign-in the cloud is pulled and merged (union by id, local wins on
- *    conflicts). First sign-in offers a one-time migration of existing
- *    localStorage data; local data is never deleted.
+ *    conflicts). The first sign-in of a device that already holds data into an
+ *    account that is still empty uploads that data once, silently and
+ *    additively (no prompt, no re-import button, nothing is ever deleted);
+ *    local data is never deleted either.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type {
@@ -15,7 +17,7 @@ import type {
   PrelimsTest, MainsTest, FocusSession, Lecture,
   CurrentAffairItem, AnswerEntry, RevisionLog, Settings,
 } from '../types';
-import { loadDb, saveDb, newDatabase, DB_VERSION, DB_KEY, CACHE_KEY_PREFIXES } from './db';
+import { loadDb, saveDb, saveDbNow, newDatabase, DB_VERSION, DB_KEY, CACHE_KEY_PREFIXES } from './db';
 import { uid } from '../lib/id';
 import { addDays, applicationDayKey, dateFromKey, todayKey } from '../lib/date';
 import { composeManualStartedAt, type ManualStudyInput } from '../lib/studyLog';
@@ -42,15 +44,12 @@ export interface StoreValue {
   authState: AuthState;
   syncStatus: SyncStatus;
   accountEmail: string | null;
-  migrationPrompt: boolean;
-  dismissMigrationPrompt: () => void;
   continueLocal: () => void;
   /** `rememberMe` (default true): true persists the session in this browser
    *  (survives reloads); false keeps it in memory only for this page session. */
   signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signUp: (email: string, password: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   logout: () => Promise<void>;
-  migrateLocalToCloud: (onStep?: (msg: string, pct: number) => void) => Promise<{ ok: boolean; error?: string }>;
   flushSync: () => Promise<void>;
   // progress
   getProgress: (itemId: string) => ItemProgress | undefined;
@@ -122,6 +121,31 @@ function emptyProgress(itemId: string, itemType: ItemType, now: string): ItemPro
   };
 }
 
+/** Pure id remap for one entity, shared by the incremental push path
+ *  (`applyIdMap`) and the one-shot first-sign-in import. */
+function remapEntityIds(d: MupDatabase, entity: string, map: Record<string, string>): MupDatabase {
+  if (!Object.keys(map).length) return d;
+  const swap = <T extends { id: string }>(arr: T[]) => arr.map((x) => (map[x.id] ? { ...x, id: map[x.id] } : x));
+  switch (entity) {
+    case 'tasks': return { ...d, tasks: swap(d.tasks) };
+    case 'pyqs': return { ...d, pyqs: swap(d.pyqs) };
+    case 'prelimsTests': return { ...d, prelimsTests: swap(d.prelimsTests) };
+    case 'mainsTests': return { ...d, mainsTests: swap(d.mainsTests) };
+    case 'focusSessions': return { ...d, focusSessions: swap(d.focusSessions) };
+    case 'lectures': return { ...d, lectures: swap(d.lectures) };
+    case 'currentAffairs': return { ...d, currentAffairs: swap(d.currentAffairs) };
+    case 'answers': return { ...d, answers: swap(d.answers) };
+    case 'habits': return {
+      ...d,
+      habits: swap(d.habits),
+      habitCompletions: d.habitCompletions.map((c) => (map[c.habitId] ? { ...c, habitId: map[c.habitId] } : c)),
+    };
+    case 'habitCompletions': return { ...d, habitCompletions: swap(d.habitCompletions) };
+    case 'revisionLogs': return { ...d, revisionLogs: swap(d.revisionLogs) };
+    default: return d;
+  }
+}
+
 type NewTaskInput = Partial<Task> & { name: string; deadline: string };
 function createTask(t: NewTaskInput): Task {
   return {
@@ -154,7 +178,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const [authState, setAuthState] = useState<AuthState>(() => (isCloudConfigured ? 'loading' : 'local'));
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
-  const [migrationPrompt, setMigrationPrompt] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ pending: 0, syncing: false, lastError: null, lastSyncAt: null });
 
   const repoRef = useRef<Repository | null>(null);
@@ -242,25 +265,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /** Rewrite local entity ids after cloud inserts return real uuids. */
   const applyIdMap = useCallback((entity: string, map: Record<string, string>) => {
     if (!Object.keys(map).length) return;
-    setDb((d) => {
-      const swap = <T extends { id: string }>(arr: T[]) => arr.map((x) => (map[x.id] ? { ...x, id: map[x.id] } : x));
-      switch (entity) {
-        case 'tasks': return { ...d, tasks: swap(d.tasks) };
-        case 'pyqs': return { ...d, pyqs: swap(d.pyqs) };
-        case 'prelimsTests': return { ...d, prelimsTests: swap(d.prelimsTests) };
-        case 'mainsTests': return { ...d, mainsTests: swap(d.mainsTests) };
-        case 'focusSessions': return { ...d, focusSessions: swap(d.focusSessions) };
-        case 'lectures': return { ...d, lectures: swap(d.lectures) };
-        case 'currentAffairs': return { ...d, currentAffairs: swap(d.currentAffairs) };
-        case 'answers': return { ...d, answers: swap(d.answers) };
-        case 'habits': return {
-          ...d,
-          habits: swap(d.habits),
-          habitCompletions: d.habitCompletions.map((c) => (map[c.habitId] ? { ...c, habitId: map[c.habitId] } : c)),
-        };
-        default: return d;
-      }
-    });
+    setDb((d) => remapEntityIds(d, entity, map));
   }, []);
 
   // ---------------------------------------------------------------- progress
@@ -687,6 +692,44 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  /** First sign-in into an empty account: push this device's local records up
+   * once, in the background, then adopt their cloud identity locally.
+   *
+   * Deliberately additive and idempotent-by-flag: the account is empty when
+   * this runs, so a re-run could only ever add rows that are not there yet —
+   * never a second copy of the database. Failure is non-fatal: the device keeps
+   * everything and the next sign-in retries. */
+  const importLocalData = useCallback(async (r: Repository) => {
+    const userId = userIdRef.current;
+    if (!userId) return;
+    try {
+      const maps = await r.importLocalToCloud(dbRef.current);
+      const remap: [string, Record<string, string>][] = [
+        ['revisionLogs', maps.revisionLogIdMap],
+        ['habits', maps.habitIdMap],
+        ['habitCompletions', maps.habitCompletionIdMap],
+        ['tasks', maps.taskIdMap],
+        ['pyqs', maps.pyqIdMap],
+        ['prelimsTests', maps.prelimsTestIdMap],
+        ['mainsTests', maps.mainsTestIdMap],
+        ['focusSessions', maps.focusSessionIdMap],
+        ['lectures', maps.lectureIdMap],
+        ['currentAffairs', maps.currentAffairIdMap],
+        ['answers', maps.answerIdMap],
+      ];
+      const remapped = remap.reduce((d, [entity, map]) => remapEntityIds(d, entity, map), dbRef.current);
+      // Adopt the cloud ids in one shot and persist them immediately: the cloud
+      // rows already live under those uuids, so a stale local copy surviving a
+      // quick close would come back as a second copy of every record.
+      dbRef.current = remapped;
+      setDb(remapped);
+      saveDbNow(remapped);
+      try { localStorage.setItem(migratedFlagKey(userId), new Date().toISOString()); } catch { /* flag is best effort */ }
+    } catch (e) {
+      setSyncStatus((s) => ({ ...s, lastError: e instanceof Error ? e.message : String(e) }));
+    }
+  }, []);
+
   const afterSignIn = useCallback(async (userId: string, email: string) => {
     userIdRef.current = userId;
     setAccountEmail(email);
@@ -704,14 +747,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const localCount = d.tasks.length + Object.keys(d.progress).length + d.pyqs.length + d.lectures.length +
         d.answers.length + d.currentAffairs.length + d.prelimsTests.length + d.mainsTests.length +
         d.focusSessions.length + d.habits.length + d.revisionLogs.length;
-      // A wipe on this device also suppresses the one-time import offer —
-      // re-uploading the records the user just deleted would undo the wipe.
-      const alreadyMigrated = Boolean(localStorage.getItem(migratedFlagKey(userId)))
+      // Importing local data is a one-time, per-account event; a wipe on this
+      // device also suppresses it (re-uploading the records the user just
+      // deleted would undo the wipe).
+      const alreadyImported = Boolean(localStorage.getItem(migratedFlagKey(userId)))
         || Boolean(localStorage.getItem(wipeMarkerKey(userId)));
       mergeRemoteIntoLocal(remote);
-      if (!alreadyMigrated && localCount > 0) {
-        setMigrationPrompt(true); // offer one-time import of this device's data
-      } else if (!alreadyMigrated && localCount === 0 && remoteCount === 0) {
+      if (!alreadyImported && localCount > 0 && remoteCount === 0) {
+        // First sign-in on a device that already holds preparation data, into an
+        // account that is still empty: upload it once, silently. There is no
+        // prompt and no "re-import" step — the cloud is empty, so this can never
+        // duplicate or overwrite anything, and it is skipped from then on.
+        await importLocalData(r);
+      } else if (!alreadyImported && localCount === 0 && remoteCount === 0) {
         // brand-new account on a fresh device — seed profile with current settings
         void r.upsertSettings(d.settings).catch(() => {});
       }
@@ -720,14 +768,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus((s) => ({ ...s, lastError: e instanceof Error ? e.message : String(e) }));
     }
     setAuthState('signed-in');
-  }, [mergeRemoteIntoLocal, activeClient]);
+  }, [mergeRemoteIntoLocal, activeClient, importLocalData]);
 
   /** Central SIGNED_OUT handler (shared by both clients). */
   const handleSignedOut = useCallback((event: string) => {
     if (event !== 'SIGNED_OUT') return;
     authClientRef.current = null;
     repoRef.current = null; userIdRef.current = null;
-    setAccountEmail(null); setMigrationPrompt(false);
+    setAccountEmail(null);
     setAuthState('gate');
   }, []);
 
@@ -785,45 +833,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     pendingOps.current.clear();
     setSyncStatus((s) => ({ ...s, pending: 0 }));
     setAccountEmail(null);
-    setMigrationPrompt(false);
     setAuthState(isCloudConfigured ? 'gate' : 'local');
   }, [activeClient]);
 
   const continueLocal = useCallback(() => setAuthState('local'), []);
-  const dismissMigrationPrompt = useCallback(() => setMigrationPrompt(false), []);
-
-  const migrateLocalToCloud = useCallback(async (onStep?: (msg: string, pct: number) => void) => {
-    const r = repo();
-    if (!r || !userIdRef.current) return { ok: false, error: 'Not signed in.' };
-    const userId = userIdRef.current;
-    try {
-      const sb = activeClient();
-      // Wipe cloud data first so (re)runs never create duplicates.
-      // Local data is NEVER touched — the device remains the safe copy.
-      onStep?.('Preparing cloud account…', 2);
-      for (const table of ['tasks', 'pyqs', 'prelims_tests', 'mains_tests', 'focus_sessions',
-        'lectures', 'current_affairs', 'answers', 'habit_completions', 'habits', 'revision_logs']) {
-        await sb.from(table).delete().eq('user_id', userId);
-      }
-      const maps = await r.migrateFromLocal(dbRef.current, onStep);
-      applyIdMap('tasks', maps.taskIdMap);
-      applyIdMap('pyqs', maps.pyqIdMap);
-      applyIdMap('prelimsTests', maps.prelimsTestIdMap);
-      applyIdMap('mainsTests', maps.mainsTestIdMap);
-      applyIdMap('focusSessions', maps.focusSessionIdMap);
-      applyIdMap('lectures', maps.lectureIdMap);
-      applyIdMap('currentAffairs', maps.currentAffairIdMap);
-      applyIdMap('answers', maps.answerIdMap);
-      applyIdMap('habits', maps.habitIdMap);
-      localStorage.setItem(migratedFlagKey(userId), new Date().toISOString());
-      setMigrationPrompt(false);
-      return { ok: true };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setSyncStatus((s) => ({ ...s, lastError: msg }));
-      return { ok: false, error: msg };
-    }
-  }, [repo, applyIdMap, activeClient]);
 
   // ---------------------------------------------------------------- boot
   useEffect(() => {
@@ -858,8 +871,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<StoreValue>(() => ({
     db, setDb,
-    authState, syncStatus, accountEmail, migrationPrompt,
-    dismissMigrationPrompt, continueLocal, signIn, signUp, logout, migrateLocalToCloud, flushSync,
+    authState, syncStatus, accountEmail,
+    continueLocal, signIn, signUp, logout, flushSync,
     getProgress, setItemStatus, setItemNotes, reviseItem, resetRevision, bulkSetStatus,
     addTask, addTasks, updateTask, toggleTask, deleteTask,
     addPrelimsTest, deletePrelimsTest, addMainsTest, deleteMainsTest,
@@ -868,8 +881,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     addCurrentAffair, updateCurrentAffair, deleteCurrentAffair,
     addAnswer, updateAnswer, deleteAnswer,
     updateSettings, replaceDb, resetProgressOnly, wipeAllData,
-  }), [db, authState, syncStatus, accountEmail, migrationPrompt,
-    dismissMigrationPrompt, continueLocal, signIn, signUp, logout, migrateLocalToCloud, flushSync,
+  }), [db, authState, syncStatus, accountEmail,
+    continueLocal, signIn, signUp, logout, flushSync,
     getProgress, setItemStatus, setItemNotes, reviseItem, resetRevision, bulkSetStatus,
     addTask, addTasks, updateTask, toggleTask, deleteTask,
     addPrelimsTest, deletePrelimsTest, addMainsTest, deleteMainsTest,

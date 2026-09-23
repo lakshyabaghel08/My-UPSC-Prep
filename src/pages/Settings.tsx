@@ -10,7 +10,7 @@ import { syllabus } from '../data/syllabus';
 import { fmtDuration } from '../lib/date';
 
 export function Settings() {
-  const { db, updateSettings, replaceDb, resetProgressOnly, wipeAllData, authState, accountEmail, syncStatus, logout, flushSync, migrateLocalToCloud } = useStore();
+  const { db, updateSettings, replaceDb, resetProgressOnly, wipeAllData, authState, accountEmail, syncStatus, logout, flushSync } = useStore();
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
@@ -95,7 +95,6 @@ export function Settings() {
                 </div>
                 <div className="row" style={{ gap: 8 }}>
                   <button className="btn sm" onClick={() => { void flushSync().then(() => push('Sync complete', 'ok')); }} disabled={syncStatus.syncing}>⟳ Sync now</button>
-                  <button className="btn sm geo" onClick={() => { void migrateLocalToCloud((m) => push(m)); push('Importing local data…'); }}>⤒ Re-import local data</button>
                   <button className="btn sm bad" onClick={() => { void logout().then(() => push('Signed out — see you soon')); }}>Sign out</button>
                 </div>
               </>

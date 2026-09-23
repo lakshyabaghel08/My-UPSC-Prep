@@ -93,6 +93,13 @@ try {
     else console.log(`  ✓ ${nav}`);
   }
 
+  // The Settings "Re-import local data" action and the first-sign-in import
+  // prompt are gone for good — re-running an import is what duplicated data.
+  const noReimportUi = !text().includes('Re-import') && !text().includes('Import your local data');
+  const noReimportCode = !bundleSrc.includes('Re-import local data') && !bundleSrc.includes('Import your local data');
+  console.log(noReimportUi && noReimportCode ? '  ✓ no re-import action or import prompt anywhere' : '  ✗ re-import UI still shipped');
+  if (!(noReimportUi && noReimportCode)) failed++;
+
   const pyqRemoved = ![...document.querySelectorAll('.nav-item')].some((node) => node.textContent?.includes('PYQ Tracker'));
   console.log(pyqRemoved ? '  ✓ standalone PYQ Tracker removed' : '  ✗ standalone PYQ Tracker still present');
   if (!pyqRemoved) failed++;

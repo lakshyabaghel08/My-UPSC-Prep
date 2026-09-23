@@ -85,15 +85,31 @@ export function loadDb(): MupDatabase {
 }
 
 let saveTimer: number | undefined;
+
+function writeDb(db: MupDatabase) {
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+  } catch (e) {
+    console.error('Failed to persist database', e);
+  }
+}
+
 export function saveDb(db: MupDatabase) {
   if (saveTimer) window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
-    try {
-      localStorage.setItem(DB_KEY, JSON.stringify(db));
-    } catch (e) {
-      console.error('Failed to persist database', e);
-    }
+    saveTimer = undefined;
+    writeDb(db);
   }, 150);
+}
+
+/** Persist right now, cancelling the debounced write.
+ * Used where an unflushed state would be wrong rather than merely stale — the
+ * record ids rewritten by a cloud import must never be lost to a quick
+ * close/reload, because the cloud copy already lives under the new ids and the
+ * next pull would then re-add every row as a second local duplicate. */
+export function saveDbNow(db: MupDatabase) {
+  if (saveTimer) { window.clearTimeout(saveTimer); saveTimer = undefined; }
+  writeDb(db);
 }
 
 export function exportDb(db: MupDatabase): string {
