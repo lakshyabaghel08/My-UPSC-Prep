@@ -9,6 +9,7 @@ export * from '../src/lib/progressState';
 export * from '../src/config/exams';
 export { syllabus } from '../src/data/syllabus';
 export { StoreProvider, useStore } from '../src/store/store';
+export { Settings } from '../src/pages/Settings';
 export { FocusTimerProvider, useFocusTimer } from '../src/ui/focusTimer';
 export { ToastProvider } from '../src/ui/toast';
 export { statusOf, treeStats, dashboardStats, revisionQueue, lectureSummary, prelimsAnalytics, confidenceSplit, focusMinutesByApplicationDay } from '../src/store/selectors';

@@ -393,9 +393,7 @@ export class Repository {
   }
 
   async insertRevisionLogs(logs: RevisionLog[]) {
-    if (!logs.length) return;
-    const { error } = await this.sb.from('revision_logs').insert(logs.map((l) => revLogToDb(this.userId, l)));
-    if (error) throw new Error(`revision_logs: ${error.message}`);
+    await this.insertRevisionLogsAndGetIds(logs);
   }
 
   /** Insert rows and return server-generated ids in the same order. */
@@ -424,7 +422,9 @@ export class Repository {
   async insertCurrentAffairsAndGetIds(items: CurrentAffairItem[]) { return this.insertReturningIds('current_affairs', items.map((c) => caToDb(this.userId, c))); }
   async insertAnswersAndGetIds(items: AnswerEntry[]) { return this.insertReturningIds('answers', items.map((a) => answerToDb(this.userId, a))); }
   async insertHabitsAndGetIds(habits: Habit[]) { return this.insertReturningIds('habits', habits.map((h) => habitToDb(this.userId, h))); }
+  async insertHabitCompletionsAndGetIds(items: HabitCompletion[]) { return this.insertReturningIds('habit_completions', items.map((c) => habitCompToDb(this.userId, c))); }
   async insertFocusSessionsAndGetIds(sessions: FocusSession[]) { return this.insertReturningIds('focus_sessions', sessions.map((s) => focusToDb(this.userId, s))); }
+  async insertRevisionLogsAndGetIds(logs: RevisionLog[]) { return this.insertReturningIds('revision_logs', logs.map((l) => revLogToDb(this.userId, l))); }
 
   async updateTask(id: string, t: Task) {
     const { error } = await this.sb.from('tasks').update(taskToDb(this.userId, t)).eq('id', id);
@@ -461,13 +461,25 @@ export class Repository {
     if (error) throw new Error(`mains_tests: ${error.message}`);
   }
 
-  // ------------------------------------------------------------ bulk migration
-  /** One-shot import of a local database into the account (Phase 6).
-   * Habits are created first; completions are re-pointed to the new uuids.
-   * Returns localId -> remoteId maps for every uuid-keyed entity so the store
-   * can remap local records to their cloud identity after a successful run. */
-  async migrateFromLocal(db: MupDatabase, onStep?: (msg: string, pct: number) => void): Promise<{
+  // ------------------------------------------------------- first-sign-in import
+  /** One-shot import of this device's local database into the account.
+   *
+   * Strictly ADDITIVE: nothing is ever deleted from the cloud. The store only
+   * calls this on the first sign-in into an account that holds no cloud rows
+   * yet (`pullAll().counts` all zero), so inserting each local record once can
+   * neither overwrite nor duplicate anything. The old "Re-import local data"
+   * action deleted every cloud row first — when a delete silently matched no
+   * rows (expired session, RLS, timeout) the re-upload *appended* a second copy
+   * of the whole database, which is the duplication users hit.
+   *
+   * Habits are created first so completions can be re-pointed at the new uuids.
+   * Every uuid-keyed entity — revision logs and habit completions included —
+   * returns a localId -> remoteId map, so the device adopts its cloud identity
+   * and the next pull cannot resurrect a second copy of the same record. */
+  async importLocalToCloud(db: MupDatabase, onStep?: (msg: string, pct: number) => void): Promise<{
+    revisionLogIdMap: Record<string, string>;
     habitIdMap: Record<string, string>;
+    habitCompletionIdMap: Record<string, string>;
     taskIdMap: Record<string, string>;
     pyqIdMap: Record<string, string>;
     prelimsTestIdMap: Record<string, string>;
@@ -495,7 +507,7 @@ export class Repository {
     }
 
     step('Uploading revision log…', 30);
-    await this.insertRevisionLogs(db.revisionLogs);
+    const revisionLogIdMap = zip(db.revisionLogs.map((l) => l.id), await this.insertRevisionLogsAndGetIds(db.revisionLogs));
 
     step('Uploading habits…', 38);
     const habitIdMap = zip(db.habits.map((h) => h.id), await this.insertHabitsAndGetIds(db.habits));
@@ -504,10 +516,11 @@ export class Repository {
     const completions = db.habitCompletions
       .map((c) => ({ ...c, habitId: habitIdMap[c.habitId] ?? c.habitId }))
       .filter((c) => habitIdMap[c.habitId]);
+    const habitCompletionIdMap: Record<string, string> = {};
     for (let i = 0; i < completions.length; i += 200) {
-      const { error } = await this.sb.from('habit_completions')
-        .insert(completions.slice(i, i + 200).map((c) => habitCompToDb(this.userId, c)));
-      if (error) throw new Error(`habit_completions: ${error.message}`);
+      const chunk = completions.slice(i, i + 200);
+      const ids = await this.insertHabitCompletionsAndGetIds(chunk);
+      Object.assign(habitCompletionIdMap, zip(chunk.map((c) => c.id), ids));
     }
 
     step('Uploading tasks…', 54);
@@ -526,7 +539,11 @@ export class Repository {
     step('Uploading answer log…', 96);
     const answerIdMap = zip(db.answers.map((a) => a.id), await this.insertAnswersAndGetIds(db.answers));
 
-    step('Migration complete ✓', 100);
-    return { habitIdMap, taskIdMap, pyqIdMap, prelimsTestIdMap, mainsTestIdMap, focusSessionIdMap, lectureIdMap, currentAffairIdMap, answerIdMap };
+    step('Import complete ✓', 100);
+    return {
+      revisionLogIdMap, habitIdMap, habitCompletionIdMap, taskIdMap, pyqIdMap,
+      prelimsTestIdMap, mainsTestIdMap, focusSessionIdMap, lectureIdMap,
+      currentAffairIdMap, answerIdMap,
+    };
   }
 }

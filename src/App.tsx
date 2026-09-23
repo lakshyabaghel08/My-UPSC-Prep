@@ -3,7 +3,7 @@ import { StoreProvider, useStore } from './store/store';
 import { ToastProvider } from './ui/toast';
 import { AppShell } from './ui/AppShell';
 import { useRoute } from './ui/router';
-import { AuthPage, MigrationModal } from './pages/Auth';
+import { AuthPage } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
 import { Syllabus } from './pages/Syllabus';
 import { Tasks } from './pages/Tasks';
@@ -56,12 +56,7 @@ function Router() {
       default: return <Dashboard />;
     }
   })();
-  return (
-    <>
-      <AppShell>{page}</AppShell>
-      <MigrationModal />
-    </>
-  );
+  return <AppShell>{page}</AppShell>;
 }
 
 export default function App() {
