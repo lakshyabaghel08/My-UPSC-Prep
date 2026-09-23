@@ -1,7 +1,8 @@
 /** Focus Workspace atmosphere — visual theme layer.
  *
- * Adapted from the reference theme implementation in
- * `reference/witherwood/index`: a per-theme gradient + ambient glow on the
+ * Adapted from the witherwood reference theme implementation (archived — the
+ * original bundle was removed from the repo): a per-theme gradient + ambient
+ * glow on the
  * workspace, drifting particles (woodland), a soft rain veil (rain) and the
  * occasional shooting star (night), plus the `--fc-*` custom properties that
  * dress the flip clock's top/bottom cards, split line, border and shadow.

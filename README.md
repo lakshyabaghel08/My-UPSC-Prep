@@ -162,7 +162,7 @@ scripts/
   syllabus-consistency-test.mjs
   logic-test.mjs / smoke-test.mjs / test-entry.ts
 public/                   # PWA: manifest, icons, service worker
-reference/                # original downloaded assets (read-only, never modified)
+reference/                # syllabus seed bundles — input to npm run generate:syllabus (read-only)
 ```
 
 Design system: hand-rolled CSS (dark/light themes via CSS variables), zero UI dependencies —

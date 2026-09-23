@@ -1,1 +1,0 @@
-import{u as t}from"./DashboardLayout-DDFk2hhF.js";import{F as o}from"./featureLimits-BPzswzob.js";const l=(e,n)=>{const{isPremium:i}=t(),a=o[e],m=a.free,s=i?1/0:Math.max(0,m-n);return{canAdd:i||n<m,remaining:i?1/0:s,limit:m,currentCount:n,isPremium:i,label:a.label}};export{l as u};
