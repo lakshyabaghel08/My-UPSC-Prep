@@ -104,7 +104,19 @@ try {
         console.log(`  ${passed ? '✓' : '✗'} ${label}`);
         if (!passed) failed++;
       }
+      const cssName = fs.readdirSync(assets).find((f) => f.endsWith('.css'));
+      const cssText = cssName ? fs.readFileSync(path.join(assets, cssName), 'utf8') : '';
+      const glowCssOk = cssText.includes('focus-glow-inner') && !cssText.includes('mask-composite');
+      console.log(`  ${glowCssOk ? '✓' : '✗'} glow CSS uses nested feathering masks without composites`);
+      if (!glowCssOk) failed++;
+      const glowNested = !!workspace.querySelector('.focus-glow .focus-glow-inner');
+      console.log(`  ${glowNested ? '✓' : '✗'} glow renders nested feathering layers`);
+      if (!glowNested) failed++;
       if (atmosphere) {
+        // Night forces the whole-app dark theme through the shared toggle path;
+        // leaving Night restores the pre-Night theme.
+        document.documentElement.dataset.theme = 'light';
+        try { window.localStorage.setItem('mup.theme', 'light'); } catch { /* ignore */ }
         for (const [environment, selector, count] of [['night', '.star-dot', 46], ['rain', '.rain-drop', 90], ['woodland', '.particle-leaf', 22]]) {
           atmosphere.value = environment;
           atmosphere.dispatchEvent(new window.Event('change', { bubbles: true }));
@@ -112,6 +124,11 @@ try {
           const passed = workspace.classList.contains(`environment-${environment}`) && workspace.querySelectorAll(selector).length === count;
           console.log(`  ${passed ? '✓' : '✗'} ${environment} atmosphere switches and preserves particles`);
           if (!passed) failed++;
+          const themeOk = environment === 'night'
+            ? document.documentElement.dataset.theme === 'dark' && window.localStorage.getItem('mup.theme') === 'dark'
+            : document.documentElement.dataset.theme === 'light' && window.localStorage.getItem('mup.theme') === 'light';
+          console.log(`  ${themeOk ? '✓' : '✗'} ${environment === 'night' ? 'night forces the app dark theme' : environment + ' restores the pre-night theme'}`);
+          if (!themeOk) failed++;
         }
       }
     }
