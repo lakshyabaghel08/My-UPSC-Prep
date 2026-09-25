@@ -142,7 +142,7 @@ function makeStar(key: number): Star {
 }
 
 export function FocusAtmosphere({ environment }: { environment: FocusEnvironment }) {
-  const leaves = useMemo(() => (environment === 'woodland' ? makeLeaves(14, 7717) : []), [environment]);
+  const leaves = useMemo(() => (environment === 'woodland' ? makeLeaves(22, 7717) : []), [environment]);
   const drops = useMemo(() => (environment === 'rain' ? makeRaindrops(20260521) : []), [environment]);
   const starfield = useMemo(() => (environment === 'night' ? makeStarfield(46, 5150) : []), [environment]);
   const [stars, setStars] = useState<Star[]>([]);
@@ -159,8 +159,8 @@ export function FocusAtmosphere({ environment }: { environment: FocusEnvironment
     const timeouts: number[] = [];
     const later = (fn: () => void, ms: number) => { timeouts.push(window.setTimeout(fn, ms)); };
     const spawn = () => {
-      // Mostly lone streaks; now and then a short shower burst of 2–5 meteors.
-      const count = Math.random() < 0.35 ? 2 + Math.floor(Math.random() * 4) : 1;
+      // Alternate lone streaks with short shower bursts of 2–5 meteors.
+      const count = Math.random() < 0.5 ? 2 + Math.floor(Math.random() * 4) : 1;
       const batch = Array.from({ length: count }, (_, index) => {
         const star = makeStar(Date.now() + index);
         if (index > 0) {
@@ -180,7 +180,7 @@ export function FocusAtmosphere({ environment }: { environment: FocusEnvironment
         if (cancelled) return;
         spawn();
         loop();
-      }, 14000 + Math.random() * 11000);
+      }, 9000 + Math.random() * 7000);
     };
     loop();
     return () => {

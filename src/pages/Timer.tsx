@@ -75,7 +75,6 @@ export function Timer() {
           <div className="page-head focus-page-head">
             <div>
               <h1>Study Timer</h1>
-              <div className="sub">{phase.toLowerCase()} · {timer.settings.soundEnabled ? timer.settings.soundscape : 'no sound'}</div>
             </div>
             <div className="page-actions">
               <button className="btn sm" onClick={() => setManualOpen(true)}>＋ Log study manually</button>
@@ -154,7 +153,7 @@ export function Timer() {
 
                 <SettingsGroup title="Atmosphere & sound">
                   <div className="settings-inline">
-                    <Field label="Atmosphere"><select className="input input-sm" value={timer.settings.environment} onChange={(event) => timer.setSettings({ environment: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland (falling leaves)</option><option value="night">Night (meteor showers)</option><option value="rain">Rain (rainfall)</option></select></Field>
+                    <Field label="Atmosphere"><select className="input input-sm" value={timer.settings.environment} onChange={(event) => timer.setSettings({ environment: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland</option><option value="night">Night</option><option value="rain">Rain</option></select></Field>
                     <Field label="Soundscape"><select className="input input-sm" value={timer.settings.soundscape} onChange={(event) => timer.setSettings({ soundscape: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland</option><option value="night">Night fire</option><option value="rain">Rainfall</option></select></Field>
                   </div>
                   <label className="setting-switch"><input type="checkbox" checked={timer.settings.soundEnabled} onChange={(event) => timer.setSettings({ soundEnabled: event.target.checked })} /><span>Ambient sound</span></label>
