@@ -6,6 +6,7 @@ import { dashboardStats } from '../store/selectors';
 import { downloadBackup } from '../store/db';
 import { useToast } from './toast';
 import { isCloudConfigured } from '../lib/supabase';
+import { applyTheme } from '../lib/theme';
 
 const NAV: { section: string; items: { to: string; icon: string; label: string; badge?: 'revision' | 'tasks' }[] }[] = [
   {
@@ -61,10 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const theme = db.settings.theme;
   const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    updateSettings({ theme: next });
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem('mup.theme', next); } catch { /* ignore */ }
+    applyTheme(theme === 'dark' ? 'light' : 'dark', updateSettings);
   };
 
   const badge = (b?: 'revision' | 'tasks') => {

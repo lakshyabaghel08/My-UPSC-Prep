@@ -675,8 +675,8 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
 .focus-workspace {
   position: relative; isolation: isolate; overflow: hidden; color: var(--text);
   --focus-accent: var(--ok);
-  --focus-glow: radial-gradient(circle at 28% 24%, color-mix(in srgb, var(--ok) 24%, transparent), transparent 60%),
-                radial-gradient(circle at 72% 28%, color-mix(in srgb, var(--geo) 18%, transparent), transparent 60%);
+  --focus-glow: radial-gradient(circle 520px at 24% 32%, color-mix(in srgb, var(--ok) 22%, transparent), transparent 72%),
+                radial-gradient(circle 460px at 78% 36%, color-mix(in srgb, var(--geo) 16%, transparent), transparent 72%);
   --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--ok) 7%, transparent), transparent 60%);
   --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--ok) 12%);
   --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--ok) 6%);
@@ -699,8 +699,8 @@ html[data-theme='dark'] .focus-workspace,
 }
 .environment-rain.focus-workspace {
   --focus-accent: var(--info);
-  --focus-glow: radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--info) 28%, transparent), transparent 60%),
-                radial-gradient(circle at 28% 32%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%);
+  --focus-glow: radial-gradient(circle 520px at 50% 8%, color-mix(in srgb, var(--info) 24%, transparent), transparent 72%),
+                radial-gradient(circle 420px at 34% 14%, color-mix(in srgb, var(--info) 13%, transparent), transparent 72%);
   --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--info) 8%, transparent), transparent 58%);
   --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--info) 12%);
   --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--info) 6%);
@@ -741,8 +741,8 @@ html[data-theme='dark'] .focus-workspace,
   --scroll-thumb: rgba(148, 163, 204, 0.22);
   --chart-grid: rgba(148, 163, 204, 0.12);
   --focus-accent: var(--accent);
-  --focus-glow: radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 60%),
-                radial-gradient(circle at 30% 28%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%);
+  --focus-glow: radial-gradient(circle 540px at 50% 15%, color-mix(in srgb, #6d8cff 28%, transparent), transparent 72%),
+                radial-gradient(circle 430px at 34% 20%, color-mix(in srgb, var(--info) 14%, transparent), transparent 72%);
   --focus-veil: linear-gradient(180deg, rgba(8, 13, 28, .5), transparent 62%);
   --fc-bg-top: var(--surface-2);
   --fc-bg-bottom: var(--surface);
@@ -761,14 +761,22 @@ html[data-theme='dark'] .focus-workspace,
 }
 
 .focus-atmosphere-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity .85s ease; }
+/* Soft aurora wash: two nested mask layers multiply their alphas (no
+   composite tricks). The outer .focus-glow feathers vertically - its fade
+   starts fully transparent at 0%, so zero paint touches the workspace's top
+   clip edge - and the inner .focus-glow-inner carries the paint and feathers
+   horizontally. */
 .focus-glow {
-  position: absolute; inset: -120px -160px auto; height: 580px;
-  background: var(--focus-glow); opacity: .85; transition: background .85s var(--ease);
-  /* Feather both axes, including the top; no visible rectangular layer edge. */
-  -webkit-mask-image: linear-gradient(transparent, #000 28%, transparent 88%), linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(transparent, #000 28%, transparent 88%), linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
-  mask-composite: intersect;
+  position: absolute; inset: 0;
+  opacity: .85; transition: background .85s var(--ease);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 55%, transparent 92%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 55%, transparent 92%);
+}
+.focus-glow-inner {
+  position: absolute; inset: 0;
+  background: var(--focus-glow); transition: background .85s var(--ease);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
 }
 .rain-veil, .leaf-veil, .night-sky { position: absolute; inset: 0; overflow: hidden; }
 

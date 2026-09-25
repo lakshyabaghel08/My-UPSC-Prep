@@ -191,7 +191,7 @@ export function FocusAtmosphere({ environment }: { environment: FocusEnvironment
 
   return (
     <div className="focus-atmosphere-layer" data-environment={environment} aria-hidden="true">
-      <div className="focus-glow" />
+      <div className="focus-glow"><div className="focus-glow-inner" /></div>
       {environment === 'rain' && (
         <div className="rain-veil">
           {drops.map((drop, index) => (

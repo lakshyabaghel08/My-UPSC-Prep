@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
+import { syncThemeToEnvironment } from '../lib/theme';
 import { fmtClock, fmtDuration } from '../lib/date';
 import { uid } from '../lib/id';
 import { useToast } from './toast';
@@ -96,7 +97,7 @@ function elapsedFor(timer: TimerState, now = Date.now()): number {
 const FocusTimerContext = createContext<FocusTimerValue | null>(null);
 
 export function FocusTimerProvider({ children }: { children: React.ReactNode }) {
-  const { addFocusSession, authState } = useStore();
+  const { addFocusSession, authState, updateSettings } = useStore();
   const { push } = useToast();
   const [settings, setSettingsState] = useState<FocusTimerSettings>(() => safeRead(SETTINGS_KEY, DEFAULT_SETTINGS));
   const [state, setState] = useState<TimerState>(() => safeRead(TIMER_KEY, defaultTimer()));
@@ -220,9 +221,21 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     }
   }, [authState]);
 
-  const setSettings = useCallback((patch: Partial<FocusTimerSettings>) => {
-    setSettingsState((current) => ({ ...current, ...patch }));
+  // Night atmosphere is the native dark app + sky: keep the whole-app theme in
+  // lockstep whenever the environment changes (setSettings below), and re-assert
+  // it on load when the saved atmosphere is already Night (idempotent).
+  useEffect(() => {
+    syncThemeToEnvironment(settingsRef.current.environment, updateSettings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const setSettings = useCallback((patch: Partial<FocusTimerSettings>) => {
+    // Atmosphere -> theme sync lives here (not in the select's onChange) so every
+    // caller gets it: entering Night forces dark mode, leaving restores the
+    // pre-Night theme unless the user manually toggled one meanwhile.
+    if (patch.environment) syncThemeToEnvironment(patch.environment, updateSettings);
+    setSettingsState((current) => ({ ...current, ...patch }));
+  }, [updateSettings]);
 
   const setTaskName = useCallback((taskName: string) => setState((timer) => ({ ...timer, taskName })), []);
   const setMode = useCallback((mode: TimerMode) => setState((timer) => ({ ...defaultTimer(), mode, taskName: timer.taskName, completedFocusCycles: timer.completedFocusCycles })), []);

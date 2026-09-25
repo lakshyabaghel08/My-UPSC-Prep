@@ -8,6 +8,7 @@ import { downloadBackup, parseBackup, DB_VERSION } from '../store/db';
 import type { MupDatabase } from '../types';
 import { syllabus } from '../data/syllabus';
 import { fmtDuration } from '../lib/date';
+import { applyTheme } from '../lib/theme';
 
 export function Settings() {
   const { db, updateSettings, replaceDb, resetProgressOnly, wipeAllData, authState, accountEmail, syncStatus, logout, flushSync } = useStore();
@@ -29,11 +30,7 @@ export function Settings() {
     sessions: db.focusSessions.length,
   };
 
-  const toggleTheme = (t: 'dark' | 'light') => {
-    updateSettings({ theme: t });
-    document.documentElement.dataset.theme = t;
-    try { localStorage.setItem('mup.theme', t); } catch { /* ignore */ }
-  };
+  const toggleTheme = (t: 'dark' | 'light') => applyTheme(t, updateSettings);
 
   const handleFile = (f: File) => {
     const reader = new FileReader();
