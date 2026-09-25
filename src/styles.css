@@ -666,91 +666,147 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
 .input.invalid { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }.field-help { display: block; color: var(--text-faint); font-size: 12px; margin-top: 4px; }.bad-text { color: var(--bad); }
 
 /* Focus Workspace -------------------------------------------------------
-   Atmospheric themes (visual only — the soundscape setting is independent) */
+   Atmospheric themes (visual only — the soundscape setting is independent).
+   The palette is entirely app-native: every surface, text and glow derives
+   from the shared design tokens, so the light/dark app theme follows
+   automatically. Each atmosphere contributes only an identity tint plus its
+   particle animation: woodland = emerald/teal (falling leaves), rain =
+   sky/indigo (rainfall), night = the app's own dark navy + indigo (meteors). */
 .focus-workspace {
   position: relative; isolation: isolate; overflow: hidden;
-  --fc-bg-top: #f0fdf4;
-  --fc-bg-bottom: #ecfdf5;
-  --fc-text: #065f46;
-  --fc-split: rgba(6, 78, 59, .15);
-  --fc-border: rgba(16, 185, 129, .25);
-  --fc-shadow: 0 10px 25px -5px rgba(6, 78, 59, .15);
   --focus-accent: var(--ok);
-  --focus-glow: radial-gradient(circle at 12% 0%, rgba(16, 185, 129, .26), transparent 46%),
-                radial-gradient(circle at 88% 8%, rgba(45, 212, 191, .18), transparent 42%);
-  --focus-veil: linear-gradient(180deg, rgba(16, 185, 129, .07), transparent 60%);
+  --focus-glow: radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--ok) 24%, transparent), transparent 46%),
+                radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--geo) 18%, transparent), transparent 42%);
+  --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--ok) 7%, transparent), transparent 60%);
+  --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--ok) 12%);
+  --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--ok) 6%);
+  --fc-text: var(--text);
+  --fc-split: color-mix(in srgb, var(--ok) 20%, var(--line-strong));
+  --fc-border: color-mix(in srgb, var(--ok) 30%, var(--line-strong));
+  --fc-shadow: 0 10px 25px -5px color-mix(in srgb, var(--ok) 16%, transparent);
+  --fc-sheen: rgba(255, 255, 255, .35);
+  --leaf-a: color-mix(in srgb, var(--ok) 78%, var(--geo));
+  --leaf-b: color-mix(in srgb, var(--ok) 55%, #a3e635);
+  --leaf-c: color-mix(in srgb, var(--geo) 65%, var(--ok));
+  --rain-color: color-mix(in srgb, var(--info) 35%, #bae6fd);
   transition: background .6s var(--ease);
 }
+html[data-theme='dark'] .focus-workspace,
+.environment-night.focus-workspace { --fc-sheen: rgba(255, 255, 255, .1); }
 .environment-woodland.focus-workspace {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--ok) 7%, var(--bg)), var(--bg) 42%);
 }
 .environment-rain.focus-workspace {
-  --fc-bg-top: #f0f9ff;
-  --fc-bg-bottom: #e0f2fe;
-  --fc-text: #075985;
-  --fc-split: rgba(12, 74, 110, .15);
-  --fc-border: rgba(14, 165, 233, .3);
-  --fc-shadow: 0 10px 25px -5px rgba(12, 74, 110, .2);
   --focus-accent: var(--info);
-  --focus-glow: radial-gradient(circle at 50% -6%, rgba(56, 189, 248, .3), transparent 52%),
-                radial-gradient(circle at 8% 20%, rgba(14, 165, 233, .16), transparent 46%);
-  --focus-veil: linear-gradient(180deg, rgba(56, 189, 248, .08), transparent 58%);
+  --focus-glow: radial-gradient(circle at 50% -6%, color-mix(in srgb, var(--info) 28%, transparent), transparent 52%),
+                radial-gradient(circle at 8% 20%, color-mix(in srgb, var(--info) 16%, transparent), transparent 46%);
+  --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--info) 8%, transparent), transparent 58%);
+  --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--info) 12%);
+  --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--info) 6%);
+  --fc-split: color-mix(in srgb, var(--info) 20%, var(--line-strong));
+  --fc-border: color-mix(in srgb, var(--info) 30%, var(--line-strong));
+  --fc-shadow: 0 10px 25px -5px color-mix(in srgb, var(--info) 16%, transparent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--info) 8%, var(--bg)), var(--bg) 44%);
 }
+/* Night needs a real dark sky for the meteor showers. Instead of an alien
+   palette it reuses the app's own dark-theme values (mirroring
+   html[data-theme='dark']) scoped to the workspace backdrop, page head and
+   timer stage; the metric/support cards below keep the user's active app
+   theme and stay readable. */
 .environment-night.focus-workspace {
-  --fc-bg-top: #1e293b;
-  --fc-bg-bottom: #0f172a;
-  --fc-text: #e2e8f0;
-  --fc-split: #020617;
-  --fc-border: rgba(139, 92, 246, .3);
-  --fc-shadow: 0 10px 25px -5px rgba(0, 0, 0, .6);
-  --focus-accent: #a78bfa;
-  --focus-glow: radial-gradient(circle at 50% -12%, rgba(139, 92, 246, .38), transparent 54%),
-                radial-gradient(circle at 14% 12%, rgba(99, 102, 241, .2), transparent 46%);
-  --focus-veil: linear-gradient(180deg, rgba(15, 23, 42, .5), transparent 62%);
-  background: linear-gradient(180deg, #101736, #0a0f22 46%, var(--bg));
+  --focus-accent: #6d8cff;
+  --focus-glow: radial-gradient(circle at 50% -12%, color-mix(in srgb, #6d8cff 32%, transparent), transparent 54%),
+                radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--info) 16%, transparent), transparent 46%);
+  --focus-veil: linear-gradient(180deg, rgba(8, 13, 28, .5), transparent 62%);
+  --fc-bg-top: #18213f;
+  --fc-bg-bottom: #121a33;
+  --fc-text: #e8ecf8;
+  --fc-split: rgba(148, 163, 204, .22);
+  --fc-border: color-mix(in srgb, #6d8cff 30%, rgba(148, 163, 204, .26));
+  --fc-shadow: 0 10px 25px -5px rgba(3, 8, 28, .55);
+  background: linear-gradient(180deg, color-mix(in srgb, #6d8cff 14%, #0b1020), #0b1020 46%, var(--bg));
 }
-/* Night only darkens the workspace chrome and the (dark) timer stage — the
-   metric/support cards below keep the app's own theme and stay readable. */
-.environment-night.focus-workspace .focus-page-head h1 { color: #f2f5ff; }
-.environment-night.focus-workspace .focus-page-head .sub { color: #a7b2cf; }
-.environment-night.focus-workspace .focus-stage { color: #e8ecf8; }
-.environment-night.focus-workspace .focus-stage .focus-clock-caption,
-.environment-night.focus-workspace .focus-stage .focus-current-work label { color: #aab4d4; }
-.environment-night.focus-workspace .focus-stage .focus-sound-state,
-.environment-night.focus-workspace .focus-stage .btn.quiet { color: #a7b2cf; }
-.environment-night.focus-workspace .focus-stage .btn.quiet:hover:not(:disabled) { background: rgba(255,255,255,.08); color: #fff; }
-.environment-night.focus-workspace .focus-stage .focus-current-work input { background: rgba(255,255,255,.06); border-bottom-color: rgba(255,255,255,.16); color: #eef2ff; }
-.environment-night.focus-workspace .focus-stage .focus-progress { background: rgba(255,255,255,.1); }
-.environment-night.focus-workspace .focus-stage .seg { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); }
-.environment-night.focus-workspace .focus-stage .seg button { color: #b9c4de; }
-.environment-night.focus-workspace .focus-stage .seg button.active { background: rgba(255,255,255,.14); color: #fff; }
+.environment-night.focus-workspace .focus-page-head,
+.environment-night.focus-workspace .focus-stage {
+  --surface: #121a33;
+  --surface-2: #18213f;
+  --surface-3: #1f2a4d;
+  --line: rgba(148, 163, 204, .14);
+  --line-strong: rgba(148, 163, 204, .26);
+  --text: #e8ecf8;
+  --text-soft: #aab4d4;
+  --text-faint: #6f7ba0;
+  --accent: #6d8cff;
+  --accent-strong: #4f6ef7;
+  --accent-soft: rgba(109, 140, 255, .16);
+}
+.environment-night.focus-workspace .focus-stage {
+  background: linear-gradient(160deg, rgba(24, 33, 63, .82), rgba(11, 16, 32, .9));
+}
 
 .focus-atmosphere-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity .85s ease; }
 .focus-glow { position: absolute; inset: -60px -40px auto; height: 460px; background: var(--focus-glow); opacity: .85; transition: background .85s var(--ease); mask-image: linear-gradient(#000, transparent 88%); }
 .rain-veil, .leaf-veil, .night-sky { position: absolute; inset: 0; overflow: hidden; }
+
+/* Rain — two parallax drop layers (far = thin, slow, dim; near = the original
+   veil) plus a slow mist drift near the ground. */
 .rain-drop {
   position: absolute; top: -12%; width: 3px; border-radius: 9999px;
-  background: linear-gradient(to bottom, rgba(186, 230, 253, 0), rgba(186, 230, 253, .85));
+  background: linear-gradient(to bottom, transparent, var(--rain-color, #bae6fd));
   animation: rainfall linear infinite; will-change: transform;
+}
+.rain-drop.layer-far { width: 2px; filter: blur(.6px); }
+.rain-mist { position: absolute; inset: auto -8% -6%; height: 34vh; }
+.mist-band {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 55% 90% at 20% 100%, color-mix(in srgb, var(--info) 12%, transparent), transparent 70%),
+              radial-gradient(ellipse 60% 100% at 75% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 72%);
+  filter: blur(12px); opacity: .8;
+  animation: mistDrift 36s ease-in-out infinite alternate;
+}
+.mist-band.b { animation-duration: 52s; animation-delay: -18s; animation-direction: alternate-reverse; opacity: .55; }
+@keyframes mistDrift {
+  from { transform: translate3d(-3%, 0, 0); }
+  to { transform: translate3d(3%, 0, 0); }
 }
 @keyframes rainfall {
   from { transform: translate3d(0, -30vh, 0) rotate(11deg); }
   to { transform: translate3d(-70px, 130vh, 0) rotate(11deg); }
 }
+
+/* Woodland — leaves in three app-token green tones, three depth layers
+   (far ones blurred and slower), with a gentle sway mid-fall. */
 .particle-leaf {
-  position: absolute; background: color-mix(in srgb, var(--ok) 72%, #a3e635);
+  position: absolute; background: var(--leaf-a); opacity: var(--op, .3);
   border-radius: 50% 0 50% 0; animation: floatLeaf var(--dur, 26s) linear infinite;
 }
+.particle-leaf.tone-b { background: var(--leaf-b); }
+.particle-leaf.tone-c { background: var(--leaf-c); }
+.particle-leaf.depth-0 { filter: blur(.7px); }
+.particle-leaf.depth-2 { box-shadow: 0 2px 6px color-mix(in srgb, var(--ok) 22%, transparent); }
 @keyframes floatLeaf {
-  0% { transform: translate3d(var(--sx, 50vw), -8vh, 0) rotate(0deg); opacity: 0; }
+  0% { transform: translate3d(var(--sx, 50vw), -8vh, 0) rotate(0deg); opacity: 0; animation-timing-function: ease-in; }
   12% { opacity: var(--op, .3); }
+  25% { transform: translate3d(calc(var(--sx, 50vw) + var(--ex, 0vw) * .25 + var(--sway, 12px)), 22vh, 0) rotate(calc(var(--rot, 360deg) * .22)); animation-timing-function: ease-in-out; }
+  50% { transform: translate3d(calc(var(--sx, 50vw) + var(--ex, 0vw) * .5 - var(--sway, 12px)), 50vh, 0) rotate(calc(var(--rot, 360deg) * .52)); animation-timing-function: ease-in-out; }
+  75% { transform: translate3d(calc(var(--sx, 50vw) + var(--ex, 0vw) * .75 + var(--sway, 12px)), 78vh, 0) rotate(calc(var(--rot, 360deg) * .78)); animation-timing-function: ease-in-out; }
   88% { opacity: var(--op, .3); }
   100% { transform: translate3d(calc(var(--sx, 50vw) + var(--ex, 0vw)), 108vh, 0) rotate(var(--rot, 360deg)); opacity: 0; }
 }
+
+/* Night — a quiet twinkling starfield so the sky is never empty, with the
+   occasional shooting star (a lone streak or a short shower burst). */
+.star-dot {
+  position: absolute; border-radius: 50%; background: #fff; opacity: var(--tw-op, .35);
+  animation: starTwinkle var(--tw-dur, 4s) ease-in-out infinite; animation-delay: var(--tw-delay, 0s);
+}
+@keyframes starTwinkle {
+  0%, 100% { opacity: var(--tw-op, .35); }
+  50% { opacity: calc(var(--tw-op, .35) * .2); }
+}
 .shooting-star {
-  position: absolute; height: 2px; width: var(--star-width, 120px); border-radius: 9999px;
+  position: absolute; height: 2px; width: var(--star-width, 120px); border-radius: 9999px; opacity: 0;
   background: linear-gradient(to right, rgba(var(--star-color, 255, 255, 255), 0), rgba(var(--star-color, 255, 255, 255), calc(var(--star-opacity, .3) * .45)) 55%, rgba(var(--star-color, 255, 255, 255), var(--star-opacity, .3)) 100%);
   box-shadow: 0 0 var(--star-glow, 6px) rgba(var(--star-color, 255, 255, 255), calc(var(--star-opacity, .3) * .55));
   animation: shootingStar var(--star-duration, 1.2s) ease-out forwards;
@@ -807,7 +863,7 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
   top: 0; transform-origin: bottom; background: var(--fc-bg-top);
   border-bottom-left-radius: 0; border-bottom-right-radius: 0;
   border-bottom: 1px solid var(--fc-split);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -2px 10px rgba(0, 0, 0, .04);
+  box-shadow: inset 0 1px 0 var(--fc-sheen, rgba(255, 255, 255, .35)), inset 0 -2px 10px rgba(0, 0, 0, .04);
 }
 .flip-half.bottom {
   bottom: 0; transform-origin: top; background: var(--fc-bg-bottom);
@@ -872,13 +928,14 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
 .session-kind.break { background: var(--ok-soft); color: var(--ok); }
 .session-status { font-size: 11.5px; color: var(--text-faint); }
 .session-status.complete { color: var(--ok); }
-.focus-mini-player { position: fixed; right: 20px; bottom: 20px; z-index: 150; width: 285px; display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 15px 14px; border: 1px solid rgba(148, 163, 184, .22); border-radius: 17px; background: linear-gradient(145deg, rgba(35, 48, 78, .97), rgba(20, 30, 55, .97)); color: #eef2ff; box-shadow: 0 18px 45px rgba(2, 6, 23, .4); backdrop-filter: blur(14px); }
+.focus-mini-player { position: fixed; right: 20px; bottom: 20px; z-index: 150; width: 285px; display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 15px 14px; border: 1px solid var(--line-strong); border-radius: 17px; background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--text); box-shadow: var(--shadow); backdrop-filter: blur(14px); }
 .focus-mini-player > div { display: flex; flex-direction: column; }
-.focus-mini-player span { color: #93c5fd; font-size: 10.5px; letter-spacing: .15em; font-weight: 800; }
+.focus-mini-player span { color: var(--accent); font-size: 10.5px; letter-spacing: .15em; font-weight: 800; }
 .focus-mini-player b { font: 800 28px ui-monospace, monospace; }
-.focus-mini-player small { color: #9aa9c4; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 205px; }
-.mini-control { width: 42px; height: 42px; border-radius: 12px; border: 1px solid #45597a; background: #2a3b5c; color: #fff; cursor: pointer; }
-.mini-close { position: absolute; right: 7px; top: 5px; border: 0; background: none; color: #8492ab; cursor: pointer; }
+.focus-mini-player small { color: var(--text-faint); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 205px; }
+.mini-control { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.mini-control:hover { border-color: var(--accent); color: var(--accent); }
+.mini-close { position: absolute; right: 7px; top: 5px; border: 0; background: none; color: var(--text-faint); cursor: pointer; }
 
 /* True fullscreen focus: the flip clock alone, exactly centred */
 .focus-clock-stage {
@@ -927,5 +984,5 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
 }
 @media (prefers-reduced-motion: reduce) {
   .flip-flap.top, .flip-flap.bottom { animation-duration: 1ms; animation-delay: 0ms; }
-  .flip-colon, .rain-drop, .particle-leaf, .shooting-star { animation: none; }
+  .flip-colon, .rain-drop, .particle-leaf, .shooting-star, .mist-band, .star-dot { animation: none; }
 }
