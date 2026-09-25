@@ -154,7 +154,7 @@ export function Timer() {
 
                 <SettingsGroup title="Atmosphere & sound">
                   <div className="settings-inline">
-                    <Field label="Atmosphere"><select className="input input-sm" value={timer.settings.environment} onChange={(event) => timer.setSettings({ environment: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland</option><option value="night">Night</option><option value="rain">Rain</option></select></Field>
+                    <Field label="Atmosphere"><select className="input input-sm" value={timer.settings.environment} onChange={(event) => timer.setSettings({ environment: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland (falling leaves)</option><option value="night">Night (meteor showers)</option><option value="rain">Rain (rainfall)</option></select></Field>
                     <Field label="Soundscape"><select className="input input-sm" value={timer.settings.soundscape} onChange={(event) => timer.setSettings({ soundscape: event.target.value as 'woodland' | 'night' | 'rain' })}><option value="woodland">Woodland</option><option value="night">Night fire</option><option value="rain">Rainfall</option></select></Field>
                   </div>
                   <label className="setting-switch"><input type="checkbox" checked={timer.settings.soundEnabled} onChange={(event) => timer.setSettings({ soundEnabled: event.target.checked })} /><span>Ambient sound</span></label>

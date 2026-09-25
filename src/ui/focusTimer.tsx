@@ -271,8 +271,21 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     void api.requestWindow({ width: 340, height: 220 }).then((win) => {
       pipWindowRef.current = win;
       win.document.body.innerHTML = `<main><div id="phase"></div><div id="clock"></div><div id="work"></div><button id="control">Pause</button></main>`;
+      // Dress the PiP window in the same design tokens as the app, read live
+      // from the current (light/dark) theme.
+      const token = (name: string, fallback: string) => {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return value || fallback;
+      };
+      const cssBg = token('--bg', '#0b1020');
+      const cssSurface2 = token('--surface-2', '#18213f');
+      const cssLine = token('--line-strong', 'rgba(148, 163, 204, .26)');
+      const cssText = token('--text', '#e8ecf8');
+      const cssFaint = token('--text-faint', '#6f7ba0');
+      const cssAccent = token('--accent', '#6d8cff');
+      const cssAccentSoft = token('--accent-soft', 'rgba(109, 140, 255, .16)');
       const style = win.document.createElement('style');
-      style.textContent = `*{box-sizing:border-box}body{margin:0;background:#081126;color:#eef2ff;font-family:Inter,system-ui}main{height:100vh;display:grid;place-content:center;text-align:center;padding:20px;background:radial-gradient(circle at top,#19345a,#081126 68%)}#phase{font-size:11px;letter-spacing:.18em;color:#7dd3fc;font-weight:800}#clock{font:800 48px ui-monospace,monospace;margin:7px}#work{font-size:12px;color:#aab6d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:290px}button{margin:14px auto 0;border:1px solid #395071;border-radius:9px;background:#172644;color:#fff;padding:8px 18px;cursor:pointer}`;
+      style.textContent = `*{box-sizing:border-box}body{margin:0;background:${cssBg};color:${cssText};font-family:Inter,system-ui}main{height:100vh;display:grid;place-content:center;text-align:center;padding:20px;background:radial-gradient(circle at top, ${cssAccentSoft}, transparent 62%)}#phase{font-size:11px;letter-spacing:.18em;color:${cssAccent};font-weight:800}#clock{font:800 48px ui-monospace,monospace;margin:7px}#work{font-size:12px;color:${cssFaint};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:290px}button{margin:14px auto 0;border:1px solid ${cssLine};border-radius:9px;background:${cssSurface2};color:${cssText};padding:8px 18px;cursor:pointer}`;
       win.document.head.appendChild(style);
       win.document.getElementById('control')?.addEventListener('click', () => stateRef.current.running ? pause() : start());
       win.addEventListener('pagehide', () => { pipWindowRef.current = null; });
