@@ -673,10 +673,10 @@ html[data-theme='light'] .card { box-shadow: 0 5px 18px rgba(30, 41, 59, .055); 
    particle animation: woodland = emerald/teal (falling leaves), rain =
    sky/indigo (rainfall), night = the app's own dark navy + indigo (meteors). */
 .focus-workspace {
-  position: relative; isolation: isolate; overflow: hidden;
+  position: relative; isolation: isolate; overflow: hidden; color: var(--text);
   --focus-accent: var(--ok);
-  --focus-glow: radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--ok) 24%, transparent), transparent 46%),
-                radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--geo) 18%, transparent), transparent 42%);
+  --focus-glow: radial-gradient(circle at 28% 24%, color-mix(in srgb, var(--ok) 24%, transparent), transparent 60%),
+                radial-gradient(circle at 72% 28%, color-mix(in srgb, var(--geo) 18%, transparent), transparent 60%);
   --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--ok) 7%, transparent), transparent 60%);
   --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--ok) 12%);
   --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--ok) 6%);
@@ -699,8 +699,8 @@ html[data-theme='dark'] .focus-workspace,
 }
 .environment-rain.focus-workspace {
   --focus-accent: var(--info);
-  --focus-glow: radial-gradient(circle at 50% -6%, color-mix(in srgb, var(--info) 28%, transparent), transparent 52%),
-                radial-gradient(circle at 8% 20%, color-mix(in srgb, var(--info) 16%, transparent), transparent 46%);
+  --focus-glow: radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--info) 28%, transparent), transparent 60%),
+                radial-gradient(circle at 28% 32%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%);
   --focus-veil: linear-gradient(180deg, color-mix(in srgb, var(--info) 8%, transparent), transparent 58%);
   --fc-bg-top: color-mix(in srgb, var(--surface) 88%, var(--info) 12%);
   --fc-bg-bottom: color-mix(in srgb, var(--surface) 94%, var(--info) 6%);
@@ -709,44 +709,67 @@ html[data-theme='dark'] .focus-workspace,
   --fc-shadow: 0 10px 25px -5px color-mix(in srgb, var(--info) 16%, transparent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--info) 8%, var(--bg)), var(--bg) 44%);
 }
-/* Night needs a real dark sky for the meteor showers. Instead of an alien
-   palette it reuses the app's own dark-theme values (mirroring
-   html[data-theme='dark']) scoped to the workspace backdrop, page head and
-   timer stage; the metric/support cards below keep the user's active app
-   theme and stay readable. */
+/* Night is the app's complete dark theme, scoped to this workspace only.
+   Keep these literals in sync with html[data-theme='dark']; shell stays themed
+   by the user's preference, while every timer/support card inherits night. */
 .environment-night.focus-workspace {
-  --focus-accent: #6d8cff;
-  --focus-glow: radial-gradient(circle at 50% -12%, color-mix(in srgb, #6d8cff 32%, transparent), transparent 54%),
-                radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--info) 16%, transparent), transparent 46%);
-  --focus-veil: linear-gradient(180deg, rgba(8, 13, 28, .5), transparent 62%);
-  --fc-bg-top: #18213f;
-  --fc-bg-bottom: #121a33;
-  --fc-text: #e8ecf8;
-  --fc-split: rgba(148, 163, 204, .22);
-  --fc-border: color-mix(in srgb, #6d8cff 30%, rgba(148, 163, 204, .26));
-  --fc-shadow: 0 10px 25px -5px rgba(3, 8, 28, .55);
-  background: linear-gradient(180deg, color-mix(in srgb, #6d8cff 14%, #0b1020), #0b1020 46%, var(--bg));
-}
-.environment-night.focus-workspace .focus-page-head,
-.environment-night.focus-workspace .focus-stage {
+  --bg: #0b1020;
+  --bg-soft: #0e142a;
   --surface: #121a33;
   --surface-2: #18213f;
   --surface-3: #1f2a4d;
-  --line: rgba(148, 163, 204, .14);
-  --line-strong: rgba(148, 163, 204, .26);
+  --line: rgba(148, 163, 204, 0.14);
+  --line-strong: rgba(148, 163, 204, 0.26);
   --text: #e8ecf8;
   --text-soft: #aab4d4;
   --text-faint: #6f7ba0;
   --accent: #6d8cff;
   --accent-strong: #4f6ef7;
-  --accent-soft: rgba(109, 140, 255, .16);
+  --accent-soft: rgba(109, 140, 255, 0.16);
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.14);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --bad: #f87171;
+  --bad-soft: rgba(248, 113, 113, 0.14);
+  --info: #38bdf8;
+  --info-soft: rgba(56, 189, 248, 0.14);
+  --geo: #2dd4bf;
+  --geo-soft: rgba(45, 212, 191, 0.14);
+  --shadow: 0 10px 30px rgba(3, 8, 28, 0.45);
+  --shadow-soft: 0 4px 14px rgba(3, 8, 28, 0.35);
+  --scroll-thumb: rgba(148, 163, 204, 0.22);
+  --chart-grid: rgba(148, 163, 204, 0.12);
+  --focus-accent: var(--accent);
+  --focus-glow: radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 60%),
+                radial-gradient(circle at 30% 28%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%);
+  --focus-veil: linear-gradient(180deg, rgba(8, 13, 28, .5), transparent 62%);
+  --fc-bg-top: var(--surface-2);
+  --fc-bg-bottom: var(--surface);
+  --fc-text: var(--text);
+  --fc-split: rgba(148, 163, 204, .22);
+  --fc-border: color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+  --fc-shadow: 0 10px 25px -5px rgba(3, 8, 28, .55);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--bg)), var(--bg) 46%, var(--bg));
+}
+/* Match dark-mode cards even under the shell's light-only card rule. */
+.environment-night.focus-workspace .card {
+  box-shadow: 0 5px 18px color-mix(in srgb, #020617 12%, transparent);
 }
 .environment-night.focus-workspace .focus-stage {
   background: linear-gradient(160deg, rgba(24, 33, 63, .82), rgba(11, 16, 32, .9));
 }
 
 .focus-atmosphere-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity .85s ease; }
-.focus-glow { position: absolute; inset: -60px -40px auto; height: 460px; background: var(--focus-glow); opacity: .85; transition: background .85s var(--ease); mask-image: linear-gradient(#000, transparent 88%); }
+.focus-glow {
+  position: absolute; inset: -120px -160px auto; height: 580px;
+  background: var(--focus-glow); opacity: .85; transition: background .85s var(--ease);
+  /* Feather both axes, including the top; no visible rectangular layer edge. */
+  -webkit-mask-image: linear-gradient(transparent, #000 28%, transparent 88%), linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(transparent, #000 28%, transparent 88%), linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  mask-composite: intersect;
+}
 .rain-veil, .leaf-veil, .night-sky { position: absolute; inset: 0; overflow: hidden; }
 
 /* Rain — two parallax drop layers (far = thin, slow, dim; near = the original
@@ -819,7 +842,7 @@ html[data-theme='dark'] .focus-workspace,
 }
 
 .focus-page-head { margin-bottom: 22px; }
-.focus-page-head h1 { font-family: Georgia, serif; font-size: 28px; font-weight: 600; }
+.focus-page-head h1 { font-family: var(--font-sans); font-size: 36px; font-weight: 800; letter-spacing: -0.02em; }
 
 /* Timer stage — the visual centre of the workspace */
 .focus-stage {
@@ -945,6 +968,25 @@ html[data-theme='dark'] .focus-workspace,
 }
 .focus-clock-stage:focus-visible { outline: none; }
 .focus-workspace.fullscreen { width: 100vw; height: 100vh; overflow: hidden; }
+/* Classic bold faces are exclusive to fullscreen, in either app theme. */
+.focus-workspace.fullscreen.environment-woodland {
+  --fc-bg-top: #f0fdf4;
+  --fc-bg-bottom: #ecfdf5;
+  --fc-text: #065f46;
+  --fc-split: rgba(6, 78, 59, .15);
+  --fc-border: rgba(16, 185, 129, .25);
+  --fc-shadow: 0 10px 25px -5px rgba(6, 78, 59, .15);
+  --fc-sheen: rgba(255, 255, 255, .45);
+}
+.focus-workspace.fullscreen.environment-rain {
+  --fc-bg-top: #f0f9ff;
+  --fc-bg-bottom: #e0f2fe;
+  --fc-text: #075985;
+  --fc-split: rgba(12, 74, 110, .15);
+  --fc-border: rgba(14, 165, 233, .3);
+  --fc-shadow: 0 10px 25px -5px rgba(12, 74, 110, .2);
+  --fc-sheen: rgba(255, 255, 255, .45);
+}
 .focus-workspace.fullscreen .flip-clock { margin: 0; gap: 14px; }
 .focus-workspace.fullscreen .flip-group { gap: 7px; }
 .focus-workspace.fullscreen .flip-digit {

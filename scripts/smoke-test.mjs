@@ -91,6 +91,30 @@ try {
     const ok = t.includes(expect);
     if (!ok) { failed++; console.log(`  ✗ ${nav}: expected "${expect}" in page`); }
     else console.log(`  ✓ ${nav}`);
+    if (nav === 'Study Timer') {
+      const workspace = document.querySelector('.focus-workspace');
+      const atmosphere = [...workspace.querySelectorAll('select')].find((select) =>
+        [...select.options].some((option) => option.value === 'night' && option.textContent === 'Night'));
+      const checks = [
+        ['timer heading has no duplicate subtitle', !workspace.querySelector('.focus-page-head .sub')],
+        ['atmosphere labels are concise', atmosphere && [...atmosphere.options].map((o) => o.textContent).join(',') === 'Woodland,Night,Rain'],
+        ['woodland has 22 leaves', workspace.querySelectorAll('.particle-leaf').length === 22],
+      ];
+      for (const [label, passed] of checks) {
+        console.log(`  ${passed ? '✓' : '✗'} ${label}`);
+        if (!passed) failed++;
+      }
+      if (atmosphere) {
+        for (const [environment, selector, count] of [['night', '.star-dot', 46], ['rain', '.rain-drop', 90], ['woodland', '.particle-leaf', 22]]) {
+          atmosphere.value = environment;
+          atmosphere.dispatchEvent(new window.Event('change', { bubbles: true }));
+          await sleep(120);
+          const passed = workspace.classList.contains(`environment-${environment}`) && workspace.querySelectorAll(selector).length === count;
+          console.log(`  ${passed ? '✓' : '✗'} ${environment} atmosphere switches and preserves particles`);
+          if (!passed) failed++;
+        }
+      }
+    }
   }
 
   // The Settings "Re-import local data" action and the first-sign-in import
